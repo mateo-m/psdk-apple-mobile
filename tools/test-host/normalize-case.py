@@ -40,7 +40,10 @@ PATH_PATTERN = re.compile(
 
 def script_path_literals(game):
     """Every path-looking string in the compiled scripts."""
-    blob = zlib.decompress(open(os.path.join(game, 'Data', 'Scripts.dat'), 'rb').read())
+    scripts = os.path.join(game, 'Data', 'Scripts.dat')
+    if not os.path.exists(scripts):
+        return set()
+    blob = zlib.decompress(open(scripts, 'rb').read())
     out = set()
     for run in re.findall(rb'[\x20-\x7e]{4,200}', blob):
         out.update(PATH_PATTERN.findall(run.decode()))
