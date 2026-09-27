@@ -23,10 +23,13 @@ Thread.new do
   sleep 0.05 until defined?(::Input) && ::Input.respond_to?(:press?)
   $stderr.puts "PSDK-MAP #{::Input::Keys.inspect}"
 
+  # A game on LiteRGSS 1 reads keys through psdk_code in the core's
+  # litergss1.rb, not through on_key_down.
   class << ::Input
-    alias_method :psdk_probe_on_key_down, :on_key_down
-    def on_key_down(*args)
-      psdk_probe_on_key_down(*args)
+    hook = %i[on_key_down psdk_code].find { |m| method_defined?(m) || private_method_defined?(m) }
+    alias_method :psdk_probe_key, hook
+    define_method(hook) do |*args|
+      psdk_probe_key(*args)
       down = ::Input::Keys.keys.select { |k| ::Input.press?(k) }
       $stderr.puts "PSDK-KEY args=#{args.inspect} down=#{down.inspect}"
       $stderr.flush
@@ -135,6 +138,8 @@ end
 # handler and not on a poll.
 Thread.new do
   sleep 0.05 until defined?(::Input) && ::Input.respond_to?(:get_text)
+  next $stderr.puts('PSDK-TEXT this build has no Input.on_text_entered') unless ::Input.respond_to?(:on_text_entered, true)
+
   class << ::Input
     alias_method :psdk_probe_on_text_entered, :on_text_entered
     def on_text_entered(text)
