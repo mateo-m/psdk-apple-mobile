@@ -34,6 +34,8 @@ Link these next to the library:
 
 Put the `support/<version>` folder of the same Ruby in the app, and give its path to `psdk_run`. The folder holds `compat.rb`, the fixes for things released games do, and `psdk_run` loads it before the game.
 
+For HTTPS, set `SSL_CERT_FILE` to a PEM file of root certificates before `psdk_run`. iOS gives Ruby's OpenSSL no certificates, so without the file each HTTPS call fails with "certificate verify failed".
+
 ## Build
 
 You need Xcode with the iOS 26 SDK, and `autoconf`, `automake`, `libtool` and `bison` from Homebrew.
