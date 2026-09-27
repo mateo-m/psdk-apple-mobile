@@ -12,18 +12,23 @@
 # proc asks for. This check drives the real game and reads what PSDK
 # holds down, which is the answer the game itself reads.
 #
-# Usage: check-key-arity-ios.sh --game <dir> [--device <udid>]
-# Prerequisite: tools/test-host/build-test-host-ios.sh
+# Usage: check-key-arity-ios.sh --game <dir> [--ruby 2.5] [--device <udid>]
+# Prerequisite: tools/test-host/build-test-host-ios.sh --ruby <version>
 set -eu
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 GAME=
+RUBY=3.0
 DEVICE=
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --game)
             GAME="$2"
+            shift 2
+            ;;
+        --ruby)
+            RUBY="$2"
             shift 2
             ;;
         --device)
@@ -55,7 +60,7 @@ fi
 # 40 is the USB HID usage of Enter. PSDK binds it to its A key, which is
 # confirm. Two presses, because the first one can land while the game is
 # still loading its scripts.
-set -- --game "$GAME" --seconds 60 --snap-every 30 --keys 30:40,45:40
+set -- --game "$GAME" --ruby "$RUBY" --seconds 60 --snap-every 30 --keys 30:40,45:40
 [ -n "$DEVICE" ] && set -- "$@" --device "$DEVICE"
 
 LOG=$(mktemp -t psdk-key-arity)
