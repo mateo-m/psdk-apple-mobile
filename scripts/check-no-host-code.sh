@@ -4,7 +4,8 @@
 # never reach up to a name that the host defines.
 #
 # Two things fail:
-#   - The word "empo" anywhere in the repo's own files or in the forks.
+#   - The launcher names "empo" and "mkxp-ios" anywhere in the repo's own
+#     files or in the forks.
 #     The ANGLE download from the empo-deps release is a file location,
 #     not launcher code, so that one name is allowed.
 #   - A weak declaration or a weak import in the forks or in src/. A weak
@@ -16,7 +17,9 @@ cd "$(dirname "$0")/.."
 
 status=0
 
-if git grep -niIw 'empo' -- . ':!scripts/check-no-host-code.sh' | grep -v 'mateo-m/empo-deps/'
+launcher='(^|[^[:alnum:]_])(empo|mkxp-ios)([^[:alnum:]_]|$)'
+
+if git grep -niIE "$launcher" -- . ':!scripts/check-no-host-code.sh' | grep -v 'mateo-m/empo-deps/'
 then
     echo "error: the lines above name a launcher" >&2
     status=1
@@ -24,7 +27,7 @@ fi
 
 for fork in sources/sfml sources/litergss2
 do
-    if git -C "$fork" grep -niIw 'empo'
+    if git -C "$fork" grep -niIE "$launcher"
     then
         echo "error: $fork names a launcher" >&2
         status=1
