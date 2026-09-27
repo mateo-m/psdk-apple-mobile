@@ -1,0 +1,74 @@
+# Builds the core for the device and the simulator, and publishes
+# psdk-ios.tar.gz when a tag v* is pushed. A run from the Actions tab
+# builds the same file and keeps it as a workflow artifact.
+#
+# The release notes give the sha256, which a host pins next to the tag.
+
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Select the newest Xcode
+        run: |
+          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
+          sudo xcode-select -s "$XCODE"
+          xcodebuild -version
+
+      - name: Install the build tools
+        run: brew install autoconf automake libtool bison
+
+      - name: Check for launcher code
+        run: scripts/check-no-host-code.sh
+
+      - name: Build
+        run: |
+          make SDK=iphoneos
+          make SDK=iphonesimulator
+
+      - name: Package
+        id: package
+        run: |
+          set -eu
+          mkdir -p out/include
+          cp src/psdk_core.h out/include/
+          {
+            echo "tag=$GITHUB_REF_NAME"
+            echo "commit=$GITHUB_SHA"
+            echo "angle=$(sed -n 's/^ANGLE_VERSION := //p' Makefile)"
+          } > out/MANIFEST
+          tar -czf psdk-ios.tar.gz -C out MANIFEST include iphoneos iphonesimulator support
+          SHA256="$(shasum -a 256 psdk-ios.tar.gz | awk '{print $1}')"
+          echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
+          echo "psdk-ios.tar.gz sha256: $SHA256"
+
+      - name: Publish the release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA256: ${{ steps.package.outputs.sha256 }}
+        run: |
+          printf 'Built from `%s`.\n\nsha256: `%s`\n' "$GITHUB_SHA" "$SHA256" > notes.md
+          gh release create "$GITHUB_REF_NAME" psdk-ios.tar.gz --title "$GITHUB_REF_NAME" --notes-file notes.md
+
+      - name: Keep the build
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: psdk-ios
+          path: psdk-ios.tar.gz

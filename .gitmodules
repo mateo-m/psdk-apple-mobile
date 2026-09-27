@@ -1,0 +1,42 @@
+[submodule "sources/openal-soft"]
+	path = sources/openal-soft
+	url = git@github.com:kcat/openal-soft.git
+	ignore = dirty
+[submodule "sources/freetype"]
+	path = sources/freetype
+	url = git@github.com:mkxp-z/freetype2
+	branch = master
+	ignore = dirty
+[submodule "sources/sfml"]
+	path = sources/sfml
+	url = git@github.com:mateo-m/sfml-apple-mobile
+	branch = main
+[submodule "sources/litecgss"]
+	path = sources/litecgss
+	url = https://gitlab.com/NuriYuri/litecgss.git
+	branch = development
+	ignore = dirty
+[submodule "sources/litergss2"]
+	path = sources/litergss2
+	url = git@github.com:mateo-m/litergss2-apple-mobile
+	branch = dev
+[submodule "sources/ruby25"]
+	path = sources/ruby25
+	url = git@github.com:ruby/ruby.git
+	branch = ruby_2_5
+	ignore = dirty
+[submodule "sources/ruby30"]
+	path = sources/ruby30
+	url = git@github.com:ruby/ruby.git
+	branch = ruby_3_0
+	ignore = dirty
+[submodule "sources/ruby32"]
+	path = sources/ruby32
+	url = git@github.com:ruby/ruby.git
+	branch = ruby_3_2
+	ignore = dirty
+[submodule "sources/ruby33"]
+	path = sources/ruby33
+	url = git@github.com:ruby/ruby.git
+	branch = ruby_3_3
+	ignore = dirty
