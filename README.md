@@ -1,6 +1,6 @@
 # psdk-apple-mobile
 
-Runs a released [Pokemon SDK](https://gitlab.com/pokemonsdk/pokemonsdk) game on iOS. The core is LiteRGSS2, LiteCGSS, SFML and one Ruby, built as one static library for each Ruby.
+Runs a released [Pokemon SDK](https://gitlab.com/pokemonsdk/pokemonsdk) game on iOS. The core is LiteRGSS2, LiteCGSS, SFML, OpenAL Soft and one Ruby, built as one static library for each Ruby.
 
 A game runs on the Ruby that compiled its bytecode:
 
