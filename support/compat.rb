@@ -118,10 +118,12 @@ end
 # Project Renaissance ships its own LiteRGSS with a ShaderedSpriteMap
 # class, and its map code needs it. The public LiteRGSS2 source has no
 # such class. This one is a SpriteMap that keeps the shader, blend mode
-# and opacity values but draws without them.
+# and opacity values but draws without them. The fade of a single tile
+# comes from SpriteMap#set_tile_opacity in the LiteRGSS2 fork.
 #
-# ponytail: the map loses its shader and opacity effects. Draw them in
-# LiteCGSS when a game needs them to be playable.
+# ponytail: shaders on single tiles are not drawn. Project Renaissance
+# only defines them and never calls them. Draw them in LiteCGSS when a
+# game needs them.
 module LiteRGSS
   if const_defined?(:SpriteMap, false) && !const_defined?(:ShaderedSpriteMap, false)
     class ShaderedSpriteMap < SpriteMap
@@ -130,14 +132,6 @@ module LiteRGSS
 
       def opacity
         @opacity || 255
-      end
-
-      def tile_opacity(index)
-        (@tile_opacity ||= {}).fetch(index, 255)
-      end
-
-      def set_tile_opacity(index, opacity)
-        (@tile_opacity ||= {})[index] = opacity
       end
 
       def tile_shader(*)
