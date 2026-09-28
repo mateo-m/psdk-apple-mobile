@@ -1,0 +1,38 @@
+diff --git a/src/src/LiteCGSS/Graphics/SpriteMap.cpp b/src/src/LiteCGSS/Graphics/SpriteMap.cpp
+index a2178a4..b90e5ec 100644
+--- a/src/src/LiteCGSS/Graphics/SpriteMap.cpp
++++ b/src/src/LiteCGSS/Graphics/SpriteMap.cpp
+@@ -57,6 +57,20 @@ void cgss::SpriteMap::setTileRect(std::size_t index, const sf::IntRect& tile) {
+ 	m_proxy->m_sprites[index].sprite.setTextureRect(tile);
+ }
+ 
++void cgss::SpriteMap::setTileOpacity(std::size_t index, sf::Uint8 opacity) {
++	if (index >= m_proxy->m_sprites.size()) {
++		return;
++	}
++	m_proxy->m_sprites[index].sprite.setColor(sf::Color(255, 255, 255, opacity));
++}
++
++sf::Uint8 cgss::SpriteMap::getTileOpacity(std::size_t index) const {
++	if (index >= m_proxy->m_sprites.size()) {
++		return 255;
++	}
++	return m_proxy->m_sprites[index].sprite.getColor().a;
++}
++
+ void cgss::SpriteMap::reset() {
+ 	LOG_DEBUG << "SpriteMap resetted";
+ 		for (auto& sprite : m_proxy->m_sprites) {
+diff --git a/src/src/LiteCGSS/Graphics/SpriteMap.h b/src/src/LiteCGSS/Graphics/SpriteMap.h
+index 861cf97..e8945c1 100644
+--- a/src/src/LiteCGSS/Graphics/SpriteMap.h
++++ b/src/src/LiteCGSS/Graphics/SpriteMap.h
+@@ -43,6 +43,8 @@ namespace cgss {
+ 		void defineMap(unsigned long tileWidth, unsigned long tileCount);
+ 		void setTile(std::size_t index, const sf::IntRect& tile, sf::Texture& texture);
+ 		void setTileRect(std::size_t index, const sf::IntRect& tile);
++		void setTileOpacity(std::size_t index, sf::Uint8 opacity);
++		sf::Uint8 getTileOpacity(std::size_t index) const;
+ 		void move(float x, float y);
+ 		void moveOrigin(float ox, float oy);
+ 		void setTileScale(float scale);
