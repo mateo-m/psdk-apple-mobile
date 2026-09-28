@@ -20,7 +20,7 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 240
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           submodules: true
 
@@ -68,7 +68,7 @@ jobs:
 
       - name: Keep the build
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: psdk-ios
           path: psdk-ios.tar.gz

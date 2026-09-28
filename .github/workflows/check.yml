@@ -9,7 +9,7 @@ jobs:
   no-host-code:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: |
           git config --global url."https://github.com/".insteadOf git@github.com:
           git submodule update --init --depth 1 sources/sfml sources/litergss2
