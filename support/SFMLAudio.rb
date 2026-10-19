@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 # PSDK requires this file to load the SFMLAudio extension. The classes
 # are already in the binary, so the file only has to exist. It also
 # carries one compatibility patch.

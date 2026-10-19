@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 // The calls of psdk_core.h that need no Ruby. They forward to the SFML
 // and LiteRGSS2 forks and to OpenAL Soft.
 #include "psdk_core.h"

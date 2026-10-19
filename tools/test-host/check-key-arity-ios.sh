@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 # Prove that a key press reaches a released PSDK game.
 #
 # LiteRGSS hands the key-pressed event to a Ruby proc. Upstream commit

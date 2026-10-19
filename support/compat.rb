@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 # Fixes for things released PSDK games do. psdk_run loads this file
 # from the support folder, after LiteRGSS registers its classes and
 # before the host's prelude and Game.rb.

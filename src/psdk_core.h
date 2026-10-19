@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 // PSDK core: runs a released Pokemon SDK game on LiteRGSS2, LiteCGSS,
 // SFML and one Ruby.
 //

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 // Reads a WAV file with SFML's own reader and writes the decoded 16-bit
 // samples to stdout. test-wav-formats.sh builds this for the Mac, not for
 // iOS, so a change to the reader can be checked in a second instead of

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 """Rename loose game files to the spelling the game's scripts use.
 
 iOS opens files case-sensitively. Windows and macOS do not, so a released

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 # PSDK games from December 2019 to about March 2021 play sound only through
 # FMOD, a closed-source Windows library. Their GameLoader requires RubyFmod,
 # and without FMOD their Audio module plays nothing. This file gives them the

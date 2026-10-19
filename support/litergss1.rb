@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 # PSDK games from December 2019 to about March 2021 call LiteRGSS 1. That
 # version drew through LiteRGSS::Graphics, read keys through LiteRGSS::Input
 # and LiteRGSS::Mouse, and let a Viewport, a Sprite or a Text exist without a

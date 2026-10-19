@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SPDX-License-Identifier: GPL-3.0-only
+# Copyright (C) 2026 Mateo M. Additional terms apply: see ADDITIONAL-TERMS.md.
+
 # Checks SFML's WAV reader against every sample format it claims to read.
 #
 # Builds the reader for the Mac, not for iOS. The reader has no platform
