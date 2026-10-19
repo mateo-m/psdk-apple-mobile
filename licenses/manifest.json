@@ -1,0 +1,125 @@
+[
+  {
+    "name": "psdk-apple-mobile",
+    "license": "GPL-3.0 with additional terms",
+    "files": ["licenses/psdk-apple-mobile.txt"]
+  },
+  {
+    "name": "LiteRGSS2",
+    "license": "No license file",
+    "files": ["licenses/litergss2.txt"]
+  },
+  {
+    "name": "LiteCGSS",
+    "license": "No license file",
+    "archives": ["libLiteCGSS_engine.a"],
+    "files": ["licenses/litecgss.txt"]
+  },
+  {
+    "name": "skalog",
+    "license": "No license file",
+    "archives": ["libskalog.a"],
+    "files": ["licenses/skalog.txt"]
+  },
+  {
+    "name": "LodePNG",
+    "license": "zlib License",
+    "files": [{ "path": "sources/litecgss/external/lodepng/lodepng.h", "from": "Copyright (c) 2005", "to": "*/" }]
+  },
+  {
+    "name": "libnsgif",
+    "license": "MIT",
+    "files": ["licenses/libnsgif.txt"]
+  },
+  {
+    "name": "Ruby",
+    "license": "Ruby License / BSD 2-Clause",
+    "archives": ["libruby.*-static.a", "libruby.*-ext.a"],
+    "files": [
+      "sources/ruby33/COPYING",
+      "sources/ruby33/BSDL",
+      "sources/ruby32/COPYING",
+      "sources/ruby30/COPYING",
+      "sources/ruby25/COPYING"
+    ]
+  },
+  {
+    "name": "libyaml",
+    "license": "MIT",
+    "files": [{ "path": "sources/ruby30/LEGAL", "from": "Copyright (c) 2006:: Kirill Simonov", "to": "[ext/" }]
+  },
+  {
+    "name": "SFML",
+    "license": "zlib License",
+    "archives": ["libsfml-*-s.a"],
+    "files": [{ "path": "sources/sfml/license.md", "from": "SFML - Copyright", "to": "## External" }]
+  },
+  {
+    "name": "stb_image",
+    "license": "MIT or public domain",
+    "files": [
+      {
+        "path": "sources/sfml/extlibs/headers/stb_image/stb_image.h",
+        "from": "This software is available under 2 licenses",
+        "to": "*/"
+      }
+    ]
+  },
+  {
+    "name": "dr_mp3",
+    "license": "MIT-0 or public domain",
+    "files": [
+      { "path": "sources/sfml/extlibs/headers/dr_mp3/dr_mp3.h", "from": "This software is available as a choice", "to": "*/" }
+    ]
+  },
+  {
+    "name": "FreeType",
+    "license": "FreeType License (FTL)",
+    "archives": ["libfreetype.a"],
+    "files": ["sources/freetype/LICENSE.TXT", "sources/freetype/docs/FTL.TXT"]
+  },
+  {
+    "name": "libpng",
+    "license": "libpng License",
+    "archives": ["libpng16.a"],
+    "files": ["downloads/libpng/LICENSE"]
+  },
+  {
+    "name": "libogg",
+    "license": "BSD 3-Clause",
+    "archives": ["libogg.a"],
+    "files": ["downloads/ogg/COPYING"]
+  },
+  {
+    "name": "libvorbis",
+    "license": "BSD 3-Clause",
+    "archives": ["libvorbis.a", "libvorbisfile.a", "libvorbisenc.a"],
+    "files": ["downloads/vorbis/COPYING"]
+  },
+  {
+    "name": "FLAC",
+    "license": "BSD 3-Clause",
+    "archives": ["libFLAC.a"],
+    "files": ["downloads/flac/COPYING.Xiph"]
+  },
+  {
+    "name": "OpenAL Soft",
+    "license": "LGPL 2.0 or later",
+    "archives": ["libopenal.a"],
+    "files": [
+      "sources/openal-soft/COPYING",
+      "sources/openal-soft/LICENSE-pffft",
+      "sources/openal-soft/fmt-11.2.0/LICENSE",
+      "sources/openal-soft/gsl/LICENSE"
+    ]
+  },
+  {
+    "name": "OpenSSL",
+    "license": "Apache License 2.0",
+    "archives": ["libssl.a", "libcrypto.a"],
+    "files": [
+      { "path": "downloads/openssl-3.5.7/README.md", "from": "Copyright (c) 1998", "to": "<!--" },
+      "downloads/openssl-3.5.7/LICENSE.txt"
+    ]
+  }
+]

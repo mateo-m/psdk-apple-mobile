@@ -1,0 +1,4 @@
+LiteRGSS2 by Nuri Yuri, Scorbutics, and contributors.
+https://gitlab.com/pokemonsdk/litergss2
+
+The LiteRGSS2 project publishes no license file.

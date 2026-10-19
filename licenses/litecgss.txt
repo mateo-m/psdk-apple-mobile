@@ -1,0 +1,4 @@
+LiteCGSS by Nuri Yuri and contributors.
+https://gitlab.com/NuriYuri/litecgss
+
+The LiteCGSS project publishes no license file.

@@ -52,7 +52,8 @@ jobs:
             echo "commit=$GITHUB_SHA"
             echo "angle=$(sed -n 's/^ANGLE_VERSION := //p' Makefile)"
           } > out/MANIFEST
-          tar -czf psdk-ios.tar.gz -C out MANIFEST include iphoneos iphonesimulator support
+          ruby tools/licenses.rb write out/licenses.json
+          tar -czf psdk-ios.tar.gz -C out MANIFEST licenses.json include iphoneos iphonesimulator support
           SHA256="$(shasum -a 256 psdk-ios.tar.gz | awk '{print $1}')"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "psdk-ios.tar.gz sha256: $SHA256"

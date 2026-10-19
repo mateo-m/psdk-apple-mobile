@@ -1,0 +1,4 @@
+skalog by Scorbutics.
+https://github.com/Scorbutics/skalog
+
+The skalog project publishes no license file.

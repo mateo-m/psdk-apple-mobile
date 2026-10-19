@@ -564,6 +564,7 @@ $(PSDK_EXPORTS): $(ROOT)/src/psdk_core.h
 $(PSDK_LIB): $(RUBY_EXT_LIB) $(PSDK_EXPORTS) $(PSDK_ARCHIVES) \
              $(wildcard $(ROOT)/src/*.cpp $(ROOT)/src/*.h) \
              $(wildcard $(SOURCES)/litergss2/ext/LiteRGSS/*.cpp $(SOURCES)/litergss2/ext/LiteRGSS/*.h)
+	@ruby $(ROOT)/tools/licenses.rb check $(notdir $(PSDK_ARCHIVES))
 	@echo "[psdk] Compiling LiteRGSS2 against Ruby $(PSDK_RUBY_VERSION)..."
 	@rm -rf $(PSDK_OBJDIR)
 	@mkdir -p $(PSDK_OBJDIR) $(dir $@)

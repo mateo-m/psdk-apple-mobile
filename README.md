@@ -17,6 +17,7 @@ Each release has `psdk-ios.tar.gz`:
 
 ```
 MANIFEST
+licenses.json
 include/psdk_core.h
 iphoneos/libpsdk25.a ... libpsdk33.a
 iphonesimulator/libpsdk25.a ... libpsdk33.a
@@ -33,6 +34,8 @@ Link these next to the library:
 - The weak frameworks CoreBluetooth and CoreHaptics.
 
 Put the `support/<version>` folder of the same Ruby in the app, and give its path to `psdk_run`. The folder holds `compat.rb`, the fixes for things released games do, and `psdk_run` loads it before the game.
+
+`licenses.json` lists the license notice of each library in the core, as `name`, `license` and `text`. Show the notices in the app. `tools/licenses.rb` writes the file from `licenses/manifest.json` and the source trees. The build fails when a linked archive has no entry in the manifest.
 
 For HTTPS, set `SSL_CERT_FILE` to a PEM file of root certificates before `psdk_run`. iOS gives Ruby's OpenSSL no certificates, so without the file each HTTPS call fails with "certificate verify failed".
 
