@@ -499,6 +499,8 @@ $(PSDK_RUBY_SRC)/.configured-$(SDK_TAG): $(PSDK_RUBY_SRC)/configure $(LIBDIR)/li
 	ac_cv_func_pwritev=no \
 	ac_cv_func_copy_file_range=no \
 	ac_cv_func_close_range=no \
+	ac_cv_func_getattrlist=no \
+	ac_cv_func_fgetattrlist=no \
 	cross_compiling=yes; \
 	sed -i '' 's|^ASFLAGS.*=.*|ASFLAGS = $$(ARCH_FLAG) $$(INCFLAGS) $(TARGETFLAGS)|' Makefile
 	$(MARK_SDK_CONFIGURED)
