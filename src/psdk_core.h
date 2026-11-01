@@ -32,10 +32,12 @@ enum PsdkResult {
 
 // Runs the game in gameDir and returns when it stops.
 //
-// Call this once for each process, and not from the main thread. Ruby's
-// `ruby_init` runs once for each process, and SFML marshals its UIKit
-// calls to the main thread with dispatch_sync, so the main thread has
-// to stay free to answer them.
+// Call this once for each process. Ruby's `ruby_init` runs once for
+// each process. On iOS, do not call it from the main thread: SFML
+// marshals its UIKit calls to the main thread with dispatch_sync, so the
+// main thread has to stay free to answer them. On macOS, call it on the
+// main thread: SFML's Cocoa backend makes its window and reads its
+// events only there.
 //
 // argc and argv come straight from main. Ruby keeps them and reads
 // argv[0] later for its own paths, so a caller that passes 0 and null
@@ -79,8 +81,8 @@ void psdk_set_touch_enabled(int enabled);
 
 // MARK: - The picture
 
-// The UIWindow that SFML made for the game, or null before the game
-// opens its window.
+// The UIWindow (iOS) or NSWindow (macOS) that SFML made for the game,
+// or null before the game opens its window.
 void *psdk_game_window(void);
 
 // The size of the game window in pixels, or 0 by 0 before the game

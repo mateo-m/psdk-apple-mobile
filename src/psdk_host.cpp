@@ -10,16 +10,25 @@
 
 #include <cstring>
 
+#include <TargetConditionals.h>
+
 #define AL_ALEXT_PROTOTYPES
 #include <AL/alc.h>
 #include <AL/alext.h>
 
 extern "C" {
+#if TARGET_OS_OSX
+void sfml_macos_inject_key_event(int sfScan, int pressed);
+void sfml_macos_inject_character(unsigned int unicode);
+void *sfml_macos_game_window();
+float sfml_macos_backing_scale();
+#else
 void sfml_ios_inject_key_event(int sfScan, int pressed);
 void sfml_ios_inject_character(unsigned int unicode);
 void sfml_ios_set_virtual_keyboard_callback(void (*callback)(int, void *), void *userdata);
 void *sfml_ios_game_window();
 float sfml_ios_backing_scale();
+#endif
 void sfml_window_pixel_size(unsigned int *width, unsigned int *height);
 void sfml_set_output_region(float x, float y, float width, float height);
 void sfml_set_default_smooth(int smooth);
@@ -31,6 +40,14 @@ void litergss_set_resolution_callback(void (*callback)(long, long, void *), void
 namespace {
 
 using Scan = sf::Keyboard::Scan;
+
+#if TARGET_OS_OSX
+void injectKeyEvent(int sfScan, int pressed) { sfml_macos_inject_key_event(sfScan, pressed); }
+void injectCharacter(unsigned int unicode) { sfml_macos_inject_character(unicode); }
+#else
+void injectKeyEvent(int sfScan, int pressed) { sfml_ios_inject_key_event(sfScan, pressed); }
+void injectCharacter(unsigned int unicode) { sfml_ios_inject_character(unicode); }
+#endif
 
 // USB HID usage IDs of the keyboard page, and the SFML scancode of each.
 Scan::Scancode toSfmlScancode(int usage) {
@@ -81,18 +98,18 @@ void psdk_inject_key(int usage, int pressed) {
     if (scan == Scan::Unknown) {
         return;
     }
-    sfml_ios_inject_key_event(scan, pressed);
+    injectKeyEvent(scan, pressed);
 
     // PSDK's name screen reads Return and Backspace as text, not as
     // keys: `update_name` confirms on code point 13 and deletes on 8.
     // On a desktop, SFML sends a text event with those code points
-    // next to the key event. The iOS backend sends no text of its own,
-    // so the two keys get theirs here. Escape gets none, because the
+    // next to the key event. An injected key gets no text from SFML, so
+    // the two keys get theirs here. Escape gets none, because the
     // name screen would eat it and the player could not leave.
     if (pressed && scan == Scan::Enter) {
-        sfml_ios_inject_character('\r');
+        injectCharacter('\r');
     } else if (pressed && scan == Scan::Backspace) {
-        sfml_ios_inject_character('\b');
+        injectCharacter('\b');
     }
 }
 
@@ -101,23 +118,34 @@ void psdk_inject_text(const char *utf8) {
         return;
     }
     for (const sf::Uint32 character : sf::String::fromUtf8(utf8, utf8 + std::strlen(utf8))) {
-        sfml_ios_inject_character(character);
+        injectCharacter(character);
     }
 }
 
+// A Mac has a keyboard, and SFML's Cocoa backend shows none on screen.
 void psdk_set_keyboard_callback(void (*callback)(int, void *), void *userdata) {
+#if !TARGET_OS_OSX
     sfml_ios_set_virtual_keyboard_callback(callback, userdata);
+#endif
 }
 
 void psdk_set_touch_enabled(int enabled) { litergss_set_touch_enabled(enabled); }
 
+#if TARGET_OS_OSX
+void *psdk_game_window(void) { return sfml_macos_game_window(); }
+#else
 void *psdk_game_window(void) { return sfml_ios_game_window(); }
+#endif
 
 void psdk_window_pixel_size(unsigned int *width, unsigned int *height) {
     sfml_window_pixel_size(width, height);
 }
 
+#if TARGET_OS_OSX
+float psdk_backing_scale(void) { return sfml_macos_backing_scale(); }
+#else
 float psdk_backing_scale(void) { return sfml_ios_backing_scale(); }
+#endif
 
 void psdk_set_output_region(float x, float y, float width, float height) {
     sfml_set_output_region(x, y, width, height);
