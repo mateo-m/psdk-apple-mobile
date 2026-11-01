@@ -1,7 +1,7 @@
 # Builds the PSDK core for one SDK: one static library for each Ruby,
 # and the Ruby support folder of each Ruby.
 #
-#   make SDK=iphonesimulator        # or SDK=iphoneos
+#   make SDK=iphonesimulator        # or SDK=iphoneos or SDK=macosx
 #   make SDK=iphoneos RUBIES=30     # only the Ruby 3.0 library
 #
 # The results go to out/$(SDK)/libpsdk<NN>.a and out/support/<version>.
@@ -19,8 +19,27 @@ LD_PLATFORM := ios-simulator
 else ifeq ($(SDK),iphoneos)
 TARGET_FLAG := -miphoneos-version-min=$(MINIMUM_REQUIRED) -target $(ARCH)-apple-ios$(MINIMUM_REQUIRED)
 LD_PLATFORM := ios
+else ifeq ($(SDK),macosx)
+TARGET_FLAG := -mmacosx-version-min=$(MINIMUM_REQUIRED) -target $(ARCH)-apple-macos$(MINIMUM_REQUIRED)
+LD_PLATFORM := macos
+# SFML's Cocoa backend keeps methods in Objective-C categories, and
+# `ld -r` drops a category that no name pulls in.
+LD_OBJC := -ObjC
 else
-$(error SDK must be iphoneos or iphonesimulator)
+$(error SDK must be iphoneos, iphonesimulator or macosx)
+endif
+
+# On macOS, SFML uses its own Cocoa window and desktop OpenGL, so it
+# needs no ANGLE. The build and the host are the same there, so FreeType
+# builds its apinames tool with $(CC) and no -isysroot. The clang of the
+# Xcode toolchain then finds no SDK unless SDKROOT names one.
+ifeq ($(SDK),macosx)
+export SDKROOT := $(shell xcrun --sdk macosx --show-sdk-path)
+CMAKE_SYSTEM := Darwin
+SFML_ANGLE :=
+else
+CMAKE_SYSTEM := iOS
+SFML_ANGLE := angle
 endif
 
 ROOT := $(CURDIR)
@@ -75,7 +94,7 @@ CMAKE_ARGS := \
 	-DCMAKE_C_FLAGS="$(CFLAGS)" \
 	-DCMAKE_CXX_FLAGS="$(CXXFLAGS)" \
 	-DCMAKE_BUILD_TYPE=Release \
-	-DCMAKE_SYSTEM_NAME=iOS \
+	-DCMAKE_SYSTEM_NAME=$(CMAKE_SYSTEM) \
 	-DCMAKE_OSX_DEPLOYMENT_TARGET=$(MINIMUM_REQUIRED) \
 	-DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
 	-DCMAKE_FIND_ROOT_PATH="$(BUILD_PREFIX)" \
@@ -223,6 +242,9 @@ OPENSSL_CONFIGURE_FLAGS := -miphoneos-version-min=$(MINIMUM_REQUIRED)
 ifeq ($(SDK),iphonesimulator)
 OPENSSL_CONFIGURE_TARGET := iossimulator-xcrun
 OPENSSL_CONFIGURE_FLAGS := -mios-simulator-version-min=$(MINIMUM_REQUIRED)
+else ifeq ($(SDK),macosx)
+OPENSSL_CONFIGURE_TARGET := darwin64-arm64-cc
+OPENSSL_CONFIGURE_FLAGS := -mmacosx-version-min=$(MINIMUM_REQUIRED)
 endif
 OPENSSL_CONFIGURED := $(OPENSSL_DIR)/.configured-$(SDK_TAG)
 
@@ -284,7 +306,7 @@ $(SOURCES)/freetype/builds/unix/configure: $(SOURCES)/freetype/autogen.sh
 # `sfml` runs the build step every time. An edit inside sources/sfml
 # would otherwise leave a stale archive in place. cmake decides what to
 # compile again, so a run with no change costs about a second.
-sfml: init_dirs angle freetype libogg libvorbis libflac openal $(SOURCES)/sfml/$(CMAKE_BUILDDIR)/Makefile
+sfml: init_dirs $(SFML_ANGLE) freetype libogg libvorbis libflac openal $(SOURCES)/sfml/$(CMAKE_BUILDDIR)/Makefile
 	cd $(SOURCES)/sfml/$(CMAKE_BUILDDIR); make -j$(NPROC); make install
 
 $(SOURCES)/sfml/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/sfml/CMakeLists.txt $(LIBDIR)/libopenal.a
@@ -587,7 +609,7 @@ $(PSDK_LIB): $(RUBY_EXT_LIB) $(PSDK_EXPORTS) $(PSDK_ARCHIVES) \
 	    -c $(ROOT)/src/sfml_audio.cpp -o $(PSDK_OBJDIR)/_psdk_sfml_audio.o
 	@echo "[psdk] Merging with ld -r..."
 	@LD=$$(xcrun --sdk $(SDK) -f ld); \
-	"$$LD" -r -arch $(ARCH) $(LD_PLATFORM_VERSION) -syslibroot $(SYSROOT) \
+	"$$LD" -r -arch $(ARCH) $(LD_PLATFORM_VERSION) -syslibroot $(SYSROOT) $(LD_OBJC) \
 	    -exported_symbols_list $(PSDK_EXPORTS) \
 	    $(PSDK_OBJDIR)/*.o $(PSDK_ARCHIVES) \
 	    -o $(PSDK_OBJDIR)/merged-pass1.o
