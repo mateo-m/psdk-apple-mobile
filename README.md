@@ -1,6 +1,6 @@
 # psdk-apple-mobile
 
-Runs a released [Pokemon SDK](https://gitlab.com/pokemonsdk/pokemonsdk) game on iOS. The core is LiteRGSS2, LiteCGSS, SFML, OpenAL Soft and one Ruby, built as one static library for each Ruby.
+Runs a released [Pokemon SDK](https://gitlab.com/pokemonsdk/pokemonsdk) game on iOS and macOS. The core is LiteRGSS2, LiteCGSS, SFML, OpenAL Soft and one Ruby, built as one static library for each Ruby.
 
 A game runs on the Ruby that compiled its bytecode:
 
@@ -21,17 +21,23 @@ licenses.json
 include/psdk_core.h
 iphoneos/libpsdk25.a ... libpsdk33.a
 iphonesimulator/libpsdk25.a ... libpsdk33.a
+macosx/libpsdk25.a ... libpsdk33.a
 support/2.5, 3.0, 3.2, 3.3
 ```
 
 `src/psdk_core.h` is the whole interface. Each library defines the names in that header and no other name. So link one library into one image. To offer more than one Ruby, link each library into its own framework.
 
-Link these next to the library:
+On iOS, link these next to the library:
 
 - ANGLE: `libANGLE_static.a`, `libEGL_static.a` and `libGLESv2_static.a` from the release that `MANIFEST` names, at https://github.com/mateo-m/empo-deps/releases.
 - `-lc++ -lz -lbz2 -liconv`
 - The frameworks Foundation, UIKit, CoreFoundation, CoreGraphics, CoreVideo, CoreAudio, AudioToolbox, AVFoundation, Metal, QuartzCore, GameController, CoreMotion and IOSurface.
 - The weak frameworks CoreBluetooth and CoreHaptics.
+
+On macOS, SFML draws with the system OpenGL, so the core needs no ANGLE. Link these next to the library:
+
+- `-ObjC -lc++ -lz -lbz2 -liconv`. Without `-ObjC`, the linker drops the Objective-C categories of SFML's Cocoa backend, and the game stops with "unrecognized selector" when it makes its window.
+- The frameworks Foundation, AppKit, Carbon, IOKit, OpenGL, CoreFoundation, CoreGraphics, CoreAudio, AudioToolbox, AudioUnit, CoreServices and Security.
 
 Put the `support/<version>` folder of the same Ruby in the app, and give its path to `psdk_run`. The folder holds `compat.rb`, the fixes for things released games do, and `psdk_run` loads it before the game.
 
@@ -41,12 +47,13 @@ For HTTPS, set `SSL_CERT_FILE` to a PEM file of root certificates before `psdk_r
 
 ## Build
 
-You need Xcode with the iOS 26 SDK, and `autoconf`, `automake`, `libtool` and `bison` from Homebrew.
+You need Xcode with the iOS 26 and macOS 26 SDKs, and `autoconf`, `automake`, `libtool` and `bison` from Homebrew.
 
 ```sh
 git submodule update --init
 make SDK=iphonesimulator            # all four Rubies
 make SDK=iphoneos RUBIES=30         # only Ruby 3.0
+make SDK=macosx                     # the Mac
 ```
 
 The results go to `out/`.
