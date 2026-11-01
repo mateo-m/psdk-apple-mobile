@@ -1,6 +1,6 @@
-# Builds the core for the device and the simulator, and publishes
-# psdk-ios.tar.gz when a tag v* is pushed. A run from the Actions tab
-# builds the same file and keeps it as a workflow artifact.
+# Builds the core for the device, the simulator and the Mac, and
+# publishes psdk-ios.tar.gz when a tag v* is pushed. A run from the
+# Actions tab builds the same file and keeps it as a workflow artifact.
 #
 # The release notes give the sha256, which a host pins next to the tag.
 
@@ -40,6 +40,7 @@ jobs:
         run: |
           make SDK=iphoneos
           make SDK=iphonesimulator
+          make SDK=macosx
 
       - name: Package
         id: package
@@ -53,7 +54,7 @@ jobs:
             echo "angle=$(sed -n 's/^ANGLE_VERSION := //p' Makefile)"
           } > out/MANIFEST
           ruby tools/licenses.rb write out/licenses.json
-          tar -czf psdk-ios.tar.gz -C out MANIFEST licenses.json include iphoneos iphonesimulator support
+          tar -czf psdk-ios.tar.gz -C out MANIFEST licenses.json include iphoneos iphonesimulator macosx support
           SHA256="$(shasum -a 256 psdk-ios.tar.gz | awk '{print $1}')"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "psdk-ios.tar.gz sha256: $SHA256"
