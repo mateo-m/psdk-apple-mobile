@@ -312,6 +312,8 @@ $(SOURCES)/sfml/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/sfml/CMakeLists.txt $(LIB
 # Yuki::VD volumes in Data/*.dat, not through PhysFS.
 #
 # patches/litecgss/tile-opacity.patch lets a game fade single map tiles.
+# patches/litecgss/desktop-glsl.patch keeps "#version" on the first line
+# of a shader, which Apple's desktop OpenGL requires.
 #
 # Runs its build step every time, for the reason given above `sfml`.
 litecgss: init_dirs sfml $(SOURCES)/litecgss/$(CMAKE_BUILDDIR)/Makefile
@@ -319,8 +321,9 @@ litecgss: init_dirs sfml $(SOURCES)/litecgss/$(CMAKE_BUILDDIR)/Makefile
 	cmake --build . --target LiteCGSS_engine --parallel $(NPROC); \
 	cp lib/libLiteCGSS_engine.a lib/libskalog.a $(LIBDIR)/
 
-$(SOURCES)/litecgss/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/litecgss/CMakeLists.txt $(SOURCES)/litecgss/external/skalog/CMakeLists.txt $(ROOT)/patches/litecgss/tile-opacity.patch
-	cd $(SOURCES)/litecgss && git checkout -- src && git apply $(ROOT)/patches/litecgss/tile-opacity.patch
+$(SOURCES)/litecgss/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/litecgss/CMakeLists.txt $(SOURCES)/litecgss/external/skalog/CMakeLists.txt $(wildcard $(ROOT)/patches/litecgss/*.patch)
+	cd $(SOURCES)/litecgss && git checkout -- src test && git clean -fdq test && \
+	git apply $(ROOT)/patches/litecgss/tile-opacity.patch $(ROOT)/patches/litecgss/desktop-glsl.patch
 	cd $(SOURCES)/litecgss; rm -rf $(CMAKE_BUILDDIR); mkdir -p $(CMAKE_BUILDDIR); cd $(CMAKE_BUILDDIR); \
 	$(CMAKE) \
 	-DBUILD_SHARED_LIBS=OFF \

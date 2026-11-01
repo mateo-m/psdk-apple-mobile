@@ -1,0 +1,307 @@
+diff --git a/src/src/LiteCGSS/Graphics/RenderStatesData.cpp b/src/src/LiteCGSS/Graphics/RenderStatesData.cpp
+index a18c4f9..8d4fcff 100644
+--- a/src/src/LiteCGSS/Graphics/RenderStatesData.cpp
++++ b/src/src/LiteCGSS/Graphics/RenderStatesData.cpp
+@@ -5,8 +5,22 @@
+ #include <SFML/Graphics/BlendMode.hpp>
+ #include "RenderStatesData.h"
+ #include "ShaderPreprocessor.h"
++#if defined(__APPLE__)
++#include <TargetConditionals.h>
++#endif
+ 
+ namespace {
++	// Desktop OpenGL reads a shader with no #version as GLSL 1.10, and Apple's
++	// compiler then rejects the 1.20 features that PSDK shaders use (uniform
++	// initializers, int to float conversion). Other desktop drivers accept them.
++	cgss::ShaderPreprocessor::Options preprocessorOptions() {
++		cgss::ShaderPreprocessor::Options options;
++#if !defined(__ANDROID__) && !(defined(__APPLE__) && !TARGET_OS_OSX)
++		options.versionDirective = "120";
++#endif
++		return options;
++	}
++
+ 	cgss::ShaderPreprocessor::Stage stageFromShaderType(sf::Shader::Type type) {
+ 		switch (type) {
+ 			case sf::Shader::Type::Vertex:   return cgss::ShaderPreprocessor::Stage::Vertex;
+@@ -114,7 +128,7 @@ bool cgss::RenderStatesData::loadShaderFromMemory(const std::string &shader, sf:
+ 	if (m_shader == nullptr) {
+ 		m_shader = std::make_unique<sf::Shader>();
+ 	}
+-	const std::string processed = ShaderPreprocessor::process(shader, stageFromShaderType(type));
++	const std::string processed = ShaderPreprocessor::process(shader, stageFromShaderType(type), preprocessorOptions());
+ 	const bool success = m_shader->loadFromMemory(processed, type);
+ 	enableShader(success);
+ 	if (!success) {
+@@ -131,8 +145,8 @@ bool cgss::RenderStatesData::loadShaderFromMemory(const std::string& vertexShade
+ 	if (m_shader == nullptr) {
+ 		m_shader = std::make_unique<sf::Shader>();
+ 	}
+-	const std::string processedVert = ShaderPreprocessor::process(vertexShader,   ShaderPreprocessor::Stage::Vertex);
+-	const std::string processedFrag = ShaderPreprocessor::process(fragmentShader, ShaderPreprocessor::Stage::Fragment);
++	const std::string processedVert = ShaderPreprocessor::process(vertexShader,   ShaderPreprocessor::Stage::Vertex, preprocessorOptions());
++	const std::string processedFrag = ShaderPreprocessor::process(fragmentShader, ShaderPreprocessor::Stage::Fragment, preprocessorOptions());
+ 	const bool success = m_shader->loadFromMemory(processedVert, processedFrag);
+ 	enableShader(success);
+ 	if (!success) {
+@@ -148,9 +162,9 @@ bool cgss::RenderStatesData::loadShaderFromMemory(const std::string& vertexShade
+ 		if (m_shader == nullptr) {
+ 			m_shader = std::make_unique<sf::Shader>();
+ 		}
+-		const std::string processedVert = ShaderPreprocessor::process(vertexShader,   ShaderPreprocessor::Stage::Vertex);
++		const std::string processedVert = ShaderPreprocessor::process(vertexShader,   ShaderPreprocessor::Stage::Vertex, preprocessorOptions());
+ 		const std::string processedGeom = ShaderPreprocessor::process(geometryShader, ShaderPreprocessor::Stage::Geometry);
+-		const std::string processedFrag = ShaderPreprocessor::process(fragmentShader, ShaderPreprocessor::Stage::Fragment);
++		const std::string processedFrag = ShaderPreprocessor::process(fragmentShader, ShaderPreprocessor::Stage::Fragment, preprocessorOptions());
+ 		const bool success = m_shader->loadFromMemory(processedVert, processedGeom, processedFrag);
+ 		enableShader(success);
+ 		if (!success) {
+diff --git a/src/src/LiteCGSS/Graphics/ShaderPreprocessor.cpp b/src/src/LiteCGSS/Graphics/ShaderPreprocessor.cpp
+index 5136f08..1dcec74 100644
+--- a/src/src/LiteCGSS/Graphics/ShaderPreprocessor.cpp
++++ b/src/src/LiteCGSS/Graphics/ShaderPreprocessor.cpp
+@@ -29,6 +29,9 @@ constexpr const char* kFragmentVaryingHeader =
+ 	"varying vec2 v_factor_npot;\n"
+ 	"#else\n"
+ 	"const vec2 v_factor_npot = vec2(1.0, 1.0);\n"
++	"#define v_texture_coordinates gl_TexCoord[0].xy\n"
++	"#define v_inv_texture_coordinates gl_TexCoord[1].xy\n"
++	"#define sf_color gl_Color\n"
+ 	"#endif\n";
+ 
+ // --- Regex constants --------------------------------------------------------
+@@ -297,6 +300,24 @@ bool alreadyProcessed(const std::string& source) {
+ 	return source.compare(0, std::strlen(kProcessedMarker), kProcessedMarker) == 0;
+ }
+ 
++// GLSL accepts only comments and blank lines before "#version", and a strict
++// compiler (Apple's OpenGL) rejects the shader when the injected header comes
++// first. The directive moves out here and goes back on top after the header.
++const std::regex kReVersionLine(R"(^[ \t]*#version[^\n]*\n?)", std::regex::multiline);
++
++std::string takeVersionLine(std::string& source) {
++	std::smatch m;
++	if (!std::regex_search(source, m, kReVersionLine)) {
++		return {};
++	}
++	std::string line = m.str();
++	if (line.empty() || line.back() != '\n') {
++		line.push_back('\n');
++	}
++	source.erase(static_cast<std::size_t>(m.position()), static_cast<std::size_t>(m.length()));
++	return line;
++}
++
+ } // namespace
+ 
+ namespace cgss {
+@@ -321,11 +342,13 @@ std::string ShaderPreprocessor::process(const std::string& source, Stage stage,
+ 		// "varying vec2 v_factor_npot;" so the primary sampler's NPOT factor
+ 		// can flow from SFML's factor_npot uniform into the fragment shader.
+ 		// Removing it from vertex would break that pipeline.
++		std::string versionLine = takeVersionLine(result);
++		if (versionLine.empty() && !opts.versionDirective.empty()) {
++			versionLine = "#version " + opts.versionDirective + "\n";
++		}
+ 		result = stripUserVFactorNpotRedeclarations(result);
+ 		const auto samplers = discoverSamplers(result);
+ 		result = injectFactorDeclarations(result, samplers);
+-		result = std::string(kFragmentVaryingHeader) + result;
+-		result = std::string(kPrecisionBlock) + result;
+ 		// Order matters: wrap texture2D BEFORE rewriting gl_TexCoord.
+ 		// The wrapper has a skip-check that bails when the UV expression already
+ 		// mentions any *_factor_npot identifier (to avoid double-wrapping shaders
+@@ -334,14 +357,17 @@ std::string ShaderPreprocessor::process(const std::string& source, Stage stage,
+ 		// fire on the engine's own output, silently dropping the per-sampler wrap.
+ 		result = wrapTexture2DCallsImpl(result);
+ 		result = rewriteGlVariables(result);
++		// After the rewrite, which would also turn the desktop names in
++		// the header back into the varyings.
++		result = std::string(kFragmentVaryingHeader) + result;
++		result = std::string(kPrecisionBlock) + result;
+ 		// Stamp the result so a subsequent process() call short-circuits.
+ 		// Must be the very first line of the output for alreadyProcessed() to
+ 		// detect it cheaply without scanning the whole source.
+-		result = std::string(kProcessedMarker) + result;
++		return std::string(kProcessedMarker) + versionLine + result;
+ 	}
+ 
+-	result = addVersionIfMissing(result, opts.versionDirective);
+-	return result;
++	return addVersionIfMissing(result, opts.versionDirective);
+ }
+ 
+ std::string ShaderPreprocessor::wrapTexture2DCalls(const std::string& source) {
+diff --git a/test/src/projects/ShaderPreprocessor/cases/author_redeclared_v_factor_npot.frag.expected b/test/src/projects/ShaderPreprocessor/cases/author_redeclared_v_factor_npot.frag.expected
+index b9b3314..ed0c186 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/author_redeclared_v_factor_npot.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/author_redeclared_v_factor_npot.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ // Author defensively redeclared v_factor_npot. The preprocessor must strip
+ // both the GL_ES varying and the desktop const fallback so its own injected
+diff --git a/test/src/projects/ShaderPreprocessor/cases/bare_primary_sampler.frag.expected b/test/src/projects/ShaderPreprocessor/cases/bare_primary_sampler.frag.expected
+index 606e964..b77bc9e 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/bare_primary_sampler.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/bare_primary_sampler.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ uniform sampler2D texture;
+ // --- per-sampler NPOT factors (auto-generated) ---
+diff --git a/test/src/projects/ShaderPreprocessor/cases/gl_color_rewrite.frag.expected b/test/src/projects/ShaderPreprocessor/cases/gl_color_rewrite.frag.expected
+index cc2087a..7b54cc4 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/gl_color_rewrite.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/gl_color_rewrite.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ uniform sampler2D texture;
+ // --- per-sampler NPOT factors (auto-generated) ---
+diff --git a/test/src/projects/ShaderPreprocessor/cases/gl_texcoord1_rewrite.frag.expected b/test/src/projects/ShaderPreprocessor/cases/gl_texcoord1_rewrite.frag.expected
+index a7006d1..4f65ae2 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/gl_texcoord1_rewrite.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/gl_texcoord1_rewrite.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ uniform sampler2D texture;
+ // --- per-sampler NPOT factors (auto-generated) ---
+diff --git a/test/src/projects/ShaderPreprocessor/cases/multi_sampler.frag.expected b/test/src/projects/ShaderPreprocessor/cases/multi_sampler.frag.expected
+index a8f2d23..ef0b6b2 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/multi_sampler.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/multi_sampler.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ uniform sampler2D texture;
+ uniform sampler2D noise;
+diff --git a/test/src/projects/ShaderPreprocessor/cases/negative_token_match.frag.expected b/test/src/projects/ShaderPreprocessor/cases/negative_token_match.frag.expected
+index 9d302fc..19f5357 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/negative_token_match.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/negative_token_match.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ // Negative-match cases: substrings that look like texture2D / gl_TexCoord /
+ // sf_color but are actually part of longer identifiers must NOT be rewritten.
+diff --git a/test/src/projects/ShaderPreprocessor/cases/nested_vec2_in_uv.frag.expected b/test/src/projects/ShaderPreprocessor/cases/nested_vec2_in_uv.frag.expected
+index a313462..d07a8f1 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/nested_vec2_in_uv.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/nested_vec2_in_uv.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ uniform sampler2D extra;
+ // --- per-sampler NPOT factors (auto-generated) ---
+diff --git a/test/src/projects/ShaderPreprocessor/cases/ruby_texture_primary.frag.expected b/test/src/projects/ShaderPreprocessor/cases/ruby_texture_primary.frag.expected
+index 3cedb2a..c41eaa7 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/ruby_texture_primary.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/ruby_texture_primary.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ uniform sampler2D rubyTexture;
+ uniform sampler2D filter;
+diff --git a/test/src/projects/ShaderPreprocessor/cases/skip_when_factor_already_present.frag.expected b/test/src/projects/ShaderPreprocessor/cases/skip_when_factor_already_present.frag.expected
+index b259fd7..48be1a4 100644
+--- a/test/src/projects/ShaderPreprocessor/cases/skip_when_factor_already_present.frag.expected
++++ b/test/src/projects/ShaderPreprocessor/cases/skip_when_factor_already_present.frag.expected
+@@ -9,6 +9,9 @@ varying vec4 sf_color;
+ varying vec2 v_factor_npot;
+ #else
+ const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
+ #endif
+ uniform sampler2D texture;
+ uniform sampler2D noise;
+diff --git a/test/src/projects/ShaderPreprocessor/cases/version_directive_hoisted.frag.expected b/test/src/projects/ShaderPreprocessor/cases/version_directive_hoisted.frag.expected
+new file mode 100644
+index 0000000..ca09d6b
+--- /dev/null
++++ b/test/src/projects/ShaderPreprocessor/cases/version_directive_hoisted.frag.expected
+@@ -0,0 +1,26 @@
++// [LiteCGSS::ShaderPreprocessor processed]
++#version 120
++#ifdef GL_ES
++precision mediump float;
++#endif
++#ifdef GL_ES
++varying vec2 v_texture_coordinates;
++varying vec2 v_inv_texture_coordinates;
++varying vec4 sf_color;
++varying vec2 v_factor_npot;
++#else
++const vec2 v_factor_npot = vec2(1.0, 1.0);
++#define v_texture_coordinates gl_TexCoord[0].xy
++#define v_inv_texture_coordinates gl_TexCoord[1].xy
++#define sf_color gl_Color
++#endif
++#ifdef GL_ES
++varying vec2 v_texture_coordinates;
++#endif
++uniform sampler2D texture;
++// --- per-sampler NPOT factors (auto-generated) ---
++#define texture_factor_npot v_factor_npot
++// -------------------------------------------------
++void main() {
++  gl_FragColor = texture2D(texture, ((v_texture_coordinates / v_factor_npot).xy) * texture_factor_npot) * sf_color;
++}
+diff --git a/test/src/projects/ShaderPreprocessor/cases/version_directive_hoisted.frag.in b/test/src/projects/ShaderPreprocessor/cases/version_directive_hoisted.frag.in
+new file mode 100644
+index 0000000..5e63b1e
+--- /dev/null
++++ b/test/src/projects/ShaderPreprocessor/cases/version_directive_hoisted.frag.in
+@@ -0,0 +1,8 @@
++#version 120
++#ifdef GL_ES
++varying vec2 v_texture_coordinates;
++#endif
++uniform sampler2D texture;
++void main() {
++  gl_FragColor = texture2D(texture, gl_TexCoord[0].xy) * gl_Color;
++}
