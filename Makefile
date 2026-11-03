@@ -74,7 +74,9 @@ CXX := $(strip $(CCACHE) $(CLANGXX))
 AR  := $(shell xcrun --sdk $(SDK) -f ar)
 RANLIB := $(shell xcrun --sdk $(SDK) -f ranlib)
 PKG_CONFIG_LIBDIR := $(LIBDIR)/pkgconfig
-CLONE := git clone -q
+# git has no retry option, and git clone deletes its folder when it fails.
+RETRY := $(SHELL) -c 'for n in 1 2 3 4 5; do "$$@" && exit 0; sleep 10; done; exit 1' retry
+CLONE := $(RETRY) git clone -q
 CURL := curl -fL --retry 5 --retry-all-errors --retry-delay 10
 GITHUB := https://github.com
 
@@ -416,7 +418,7 @@ RUBY31_OPENSSL := $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION)-openssl
 $(RUBY31_OPENSSL)/extconf.rb:
 	rm -rf $(RUBY31_OPENSSL) $(RUBY31_OPENSSL).git
 	git init -q --bare $(RUBY31_OPENSSL).git
-	git -C $(RUBY31_OPENSSL).git fetch -q --depth 1 --filter=blob:none \
+	$(RETRY) git -C $(RUBY31_OPENSSL).git fetch -q --depth 1 --filter=blob:none \
 		$(GITHUB)/ruby/ruby.git $(RUBY31_OPENSSL_COMMIT)
 	mkdir -p $(RUBY31_OPENSSL)
 	git -C $(RUBY31_OPENSSL).git archive $(RUBY31_OPENSSL_COMMIT) ext/openssl \
@@ -488,7 +490,7 @@ $(RUBY_LIB): $(PSDK_RUBY_SRC)/.configured-$(SDK_TAG)
 # and zlib at boot, so a lost extension stops the game at its first
 # `require`.
 $(RUBY_EXT_LIB): $(RUBY_LIB)
-	cd $(PSDK_RUBY_SRC); \
+	set -e; cd $(PSDK_RUBY_SRC); \
 	$(CONFIGURE_ENV) make -j$(NPROC) $(PSDK_RUBY_MAKE_ARGS) miniruby exts.mk libencs; \
 	EXT_TARGETS=$$(awk '/^extensions =/,/[^\\]$$/' exts.mk | tr '\\' ' ' | grep -oE 'ext/[^ ]+' | sed 's|/\.$$|/static|'); \
 	$(CONFIGURE_ENV) make -j$(NPROC) -f exts.mk ext/extinit.o $$EXT_TARGETS; \
