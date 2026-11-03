@@ -238,6 +238,7 @@ $(SOURCES)/openal-soft/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/openal-soft/CMakeL
 
 # OpenSSL. A released PSDK game requires openssl at boot.
 OPENSSL_VERSION := 3.5.7
+OPENSSL_SHA256 := a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8
 OPENSSL_DIR := $(DOWNLOADS)/openssl-$(OPENSSL_VERSION)
 OPENSSL_CONFIGURE_TARGET := ios64-xcrun
 OPENSSL_CONFIGURE_FLAGS := -miphoneos-version-min=$(MINIMUM_REQUIRED)
@@ -255,7 +256,7 @@ openssl: init_dirs $(BUILD_PREFIX)/.openssl-installed
 $(LIBDIR)/libcrypto.a: $(BUILD_PREFIX)/.openssl-installed
 
 $(BUILD_PREFIX)/.openssl-installed: $(OPENSSL_CONFIGURED)
-	cd $(OPENSSL_DIR); $(MAKE) -j$(NPROC); $(MAKE) install_sw
+	cd $(OPENSSL_DIR); $(MAKE) -j$(NPROC) build_libs; $(MAKE) install_dev
 	touch $@
 
 # A pristine tree for each SDK. `make distclean` left simulator objects
@@ -273,7 +274,9 @@ $(OPENSSL_CONFIGURED): $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz
 
 $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz:
 	@mkdir -p $(DOWNLOADS)
-	$(CURL) -o $@ $(GITHUB)/openssl/openssl/releases/download/openssl-$(OPENSSL_VERSION)/openssl-$(OPENSSL_VERSION).tar.gz
+	$(CURL) -o $@.part $(GITHUB)/openssl/openssl/releases/download/openssl-$(OPENSSL_VERSION)/openssl-$(OPENSSL_VERSION).tar.gz
+	echo "$(OPENSSL_SHA256)  $@.part" | shasum -a 256 -c
+	mv $@.part $@
 
 # FreeType (submodule)
 freetype: init_dirs libpng $(LIBDIR)/libfreetype.a
