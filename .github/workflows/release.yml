@@ -101,18 +101,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA256: ${{ needs.package.outputs.sha256 }}
         run: |
+          # shellcheck disable=SC2016 # The backticks are Markdown.
           printf 'Built from `%s`.\n\nsha256: `%s`\n' "$GITHUB_SHA" "$SHA256" > notes.md
           gh release create "$GITHUB_REF_NAME" psdk-ios.tar.gz -R "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes-file notes.md
 
       - name: Send the core-released event
         env:
-          GH_TOKEN: ${{ secrets.EMPO_APP_DISPATCH_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_DISPATCH_TOKEN }}
+          TARGET: ${{ vars.RELEASE_DISPATCH_REPO }}
           SHA256: ${{ needs.package.outputs.sha256 }}
         run: |
-          if [ -z "$GH_TOKEN" ]; then
-            echo "::notice::EMPO_APP_DISPATCH_TOKEN is not set, so no core-released event goes out."
+          if [ -z "$TARGET" ] || [ -z "$GH_TOKEN" ]; then
+            echo "::notice::RELEASE_DISPATCH_REPO or RELEASE_DISPATCH_TOKEN is not set, so no core-released event goes out."
             exit 0
           fi
           jq -n --arg version "$GITHUB_REF_NAME" --arg sha256 "$SHA256" \
             '{event_type: "core-released", client_payload: {core: "psdk", version: $version, asset: "psdk-ios.tar.gz", sha256: $sha256}}' \
-            | gh api repos/mateo-m/empo-app/dispatches --input -
+            | gh api "repos/$TARGET/dispatches" --input -
