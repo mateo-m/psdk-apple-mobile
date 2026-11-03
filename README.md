@@ -56,7 +56,7 @@ make SDK=iphoneos RUBIES=30         # only Ruby 3.0
 make SDK=macosx                     # the Mac
 ```
 
-The results go to `out/`.
+The results go to `out/`. With `CCACHE=ccache`, the build compiles through ccache.
 
 ## Test
 

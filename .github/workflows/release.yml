@@ -1,76 +1,130 @@
-# Builds the core for the device, the simulator and the Mac, and
-# publishes psdk-ios.tar.gz when a tag v* is pushed. A run from the
-# Actions tab builds the same file and keeps it as a workflow artifact.
-#
 # The release notes give the sha256, which a host pins next to the tag.
 
 name: release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Build and keep psdk-ios.tar.gz as a workflow artifact, but publish nothing.
+        type: boolean
+        default: true
+
+# A tag pushed with its commit waits for the run on main, and then takes
+# the three builds from the cache that run saved.
+# queue: max keeps every waiting run. Without it, a new run cancels the
+# one that waits.
+concurrency:
+  group: release-${{ github.sha }}
+  queue: max
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
-    runs-on: macos-latest
-    timeout-minutes: 240
+    uses: ./.github/workflows/build.yml
+    with:
+      sdks: '["iphoneos", "iphonesimulator", "macosx"]'
+      keep: ${{ github.ref_type == 'tag' || github.event_name == 'workflow_dispatch' }}
+
+  package:
+    needs: build
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha256: ${{ steps.package.outputs.sha256 }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          submodules: true
-
-      - name: Select the newest Xcode
-        run: |
-          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
-          sudo xcode-select -s "$XCODE"
-          xcodebuild -version
-
-      - name: Install the build tools
-        run: brew install autoconf automake libtool bison
-
-      - name: Check for launcher code
-        run: scripts/check-no-host-code.sh
-
-      - name: Build
-        run: |
-          make SDK=iphoneos
-          make SDK=iphonesimulator
-          make SDK=macosx
+          pattern: psdk-*
+          merge-multiple: true
 
       - name: Package
         id: package
         run: |
           set -eu
+          for sdk in iphoneos iphonesimulator macosx; do
+            mkdir -p "parts/$sdk"
+            tar -xzf "psdk-$sdk.tar.gz" -C "parts/$sdk"
+          done
+          for sdk in iphonesimulator macosx; do
+            diff -r parts/iphoneos/support "parts/$sdk/support"
+            diff parts/iphoneos/licenses.json "parts/$sdk/licenses.json"
+          done
           mkdir -p out/include
           cp src/psdk_core.h out/include/
+          cp -R parts/iphoneos/support parts/iphoneos/licenses.json out/
+          for sdk in iphoneos iphonesimulator macosx; do
+            cp -R "parts/$sdk/$sdk" out/
+          done
           {
             echo "tag=$GITHUB_REF_NAME"
             echo "commit=$GITHUB_SHA"
             echo "angle=$(sed -n 's/^ANGLE_VERSION := //p' Makefile)"
           } > out/MANIFEST
-          ruby tools/licenses.rb write out/licenses.json
-          tar -czf psdk-ios.tar.gz -C out MANIFEST licenses.json include iphoneos iphonesimulator macosx support
-          SHA256="$(shasum -a 256 psdk-ios.tar.gz | awk '{print $1}')"
+          tar --format=posix -czf psdk-ios.tar.gz -C out MANIFEST licenses.json include iphoneos iphonesimulator macosx support
+          SHA256="$(sha256sum psdk-ios.tar.gz | cut -d' ' -f1)"
           echo "sha256=$SHA256" >> "$GITHUB_OUTPUT"
           echo "psdk-ios.tar.gz sha256: $SHA256"
 
-      - name: Publish the release
-        if: github.event_name == 'push'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA256: ${{ steps.package.outputs.sha256 }}
-        run: |
-          printf 'Built from `%s`.\n\nsha256: `%s`\n' "$GITHUB_SHA" "$SHA256" > notes.md
-          gh release create "$GITHUB_REF_NAME" psdk-ios.tar.gz --title "$GITHUB_REF_NAME" --notes-file notes.md
-
-      - name: Keep the build
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: psdk-ios
           path: psdk-ios.tar.gz
+          compression-level: 0
+
+  publish:
+    needs: package
+    if: github.ref_type == 'tag' && (github.event_name == 'push' || !inputs.dry-run)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: psdk-ios
+
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: psdk-ios.tar.gz
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA256: ${{ needs.package.outputs.sha256 }}
+        run: |
+          # shellcheck disable=SC2016 # The backticks are Markdown.
+          printf 'Built from `%s`.\n\nsha256: `%s`\n' "$GITHUB_SHA" "$SHA256" > notes.md
+          gh release create "$GITHUB_REF_NAME" psdk-ios.tar.gz -R "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes-file notes.md
+
+  # A job of its own, so a re-run after a failed event does not create the
+  # release a second time.
+  notify:
+    needs: [package, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send the core-released event
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_DISPATCH_TOKEN }}
+          TARGET: ${{ vars.RELEASE_DISPATCH_REPO }}
+          SHA256: ${{ needs.package.outputs.sha256 }}
+        run: |
+          if [ -z "$TARGET" ] || [ -z "$GH_TOKEN" ]; then
+            echo "::notice::RELEASE_DISPATCH_REPO or RELEASE_DISPATCH_TOKEN is not set, so no core-released event goes out."
+            exit 0
+          fi
+          jq -n --arg version "$GITHUB_REF_NAME" --arg sha256 "$SHA256" \
+            '{event_type: "core-released", client_payload: {core: "psdk", version: $version, asset: "psdk-ios.tar.gz", sha256: $sha256}}' \
+            | gh api "repos/$TARGET/dispatches" --input -

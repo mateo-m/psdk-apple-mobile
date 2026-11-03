@@ -65,12 +65,19 @@ NPROC := $(shell sysctl -n hw.ncpu)
 CFLAGS := -I$(INCLUDEDIR) -I$(INCLUDEDIR)/freetype2 $(TARGETFLAGS) -O3
 CXXFLAGS := $(CFLAGS)
 LDFLAGS := -L$(LIBDIR) $(TARGETFLAGS)
-CC  := $(shell xcrun --sdk $(SDK) -f clang) -arch $(ARCH)
-CXX := $(shell xcrun --sdk $(SDK) -f clang++) -arch $(ARCH)
+# CCACHE=ccache puts ccache in front of each compile.
+CCACHE ?=
+CLANG := $(shell xcrun --sdk $(SDK) -f clang) -arch $(ARCH)
+CLANGXX := $(shell xcrun --sdk $(SDK) -f clang++) -arch $(ARCH)
+CC  := $(strip $(CCACHE) $(CLANG))
+CXX := $(strip $(CCACHE) $(CLANGXX))
 AR  := $(shell xcrun --sdk $(SDK) -f ar)
 RANLIB := $(shell xcrun --sdk $(SDK) -f ranlib)
 PKG_CONFIG_LIBDIR := $(LIBDIR)/pkgconfig
-CLONE := git clone -q
+# git has no retry option, and git clone deletes its folder when it fails.
+RETRY := $(SHELL) -c 'for n in 1 2 3 4 5; do "$$@" && exit 0; sleep 10; done; exit 1' retry
+CLONE := $(RETRY) git clone -q
+CURL := curl -fL --retry 5 --retry-all-errors --retry-delay 10
 GITHUB := https://github.com
 
 # The host build triple. Apple's system Ruby reports a triple that
@@ -100,10 +107,11 @@ CMAKE_ARGS := \
 	-DCMAKE_FIND_ROOT_PATH="$(BUILD_PREFIX)" \
 	-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
 	-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
-	-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH
+	-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
+	$(if $(CCACHE),-DCMAKE_C_COMPILER_LAUNCHER=$(CCACHE) -DCMAKE_CXX_COMPILER_LAUNCHER=$(CCACHE))
 
 CONFIGURE := $(CONFIGURE_ENV) ./configure $(CONFIGURE_ARGS)
-CMAKE     := $(CONFIGURE_ENV) cmake .. $(CMAKE_ARGS)
+CMAKE     := $(CONFIGURE_ENV) CC="$(CLANG)" CXX="$(CLANGXX)" cmake .. $(CMAKE_ARGS)
 
 .PHONY: all init_dirs angle libogg libvorbis libflac libpng openal openssl freetype sfml litecgss
 
@@ -118,8 +126,9 @@ init_dirs:
 # ANGLE (prebuilt). SFML draws with GLES through ANGLE, which draws with
 # Metal. The core needs the headers only. A host links the static
 # libraries of the same release.
-ANGLE_VERSION := angle-2026-05-04
-ANGLE_SHA256 := 0cd2b87b132b2c1344fe356ebcb57fa6ec63675d33d6fa11deb8a16bd57d3b9c
+ANGLE_VERSION := angle-2026-11-01
+ANGLE_SHA256 := 22f6b332acaa9973650c30a99314287594fbf9ed38db682c2389bd34181e7831
+ANGLE_ASSET := angle-apple-prebuilt.tar.gz
 ANGLE_DIR := $(DOWNLOADS)/angle
 ANGLE_STAMP := $(ANGLE_DIR)/.$(ANGLE_VERSION)
 
@@ -127,13 +136,13 @@ angle: $(ANGLE_STAMP)
 
 $(ANGLE_STAMP):
 	@mkdir -p $(DOWNLOADS)
-	curl -fL --retry 3 -o $(DOWNLOADS)/angle-ios-prebuilt.tar.gz \
-		$(GITHUB)/mateo-m/empo-deps/releases/download/$(ANGLE_VERSION)/angle-ios-prebuilt.tar.gz
-	echo "$(ANGLE_SHA256)  $(DOWNLOADS)/angle-ios-prebuilt.tar.gz" | shasum -a 256 -c
+	$(CURL) -o $(DOWNLOADS)/$(ANGLE_ASSET) \
+		$(GITHUB)/mateo-m/empo-deps/releases/download/$(ANGLE_VERSION)/$(ANGLE_ASSET)
+	echo "$(ANGLE_SHA256)  $(DOWNLOADS)/$(ANGLE_ASSET)" | shasum -a 256 -c
 	rm -rf $(ANGLE_DIR)
 	mkdir -p $(ANGLE_DIR)
-	tar -xzf $(DOWNLOADS)/angle-ios-prebuilt.tar.gz -C $(ANGLE_DIR)
-	rm $(DOWNLOADS)/angle-ios-prebuilt.tar.gz
+	tar -xzf $(DOWNLOADS)/$(ANGLE_ASSET) -C $(ANGLE_DIR)
+	rm $(DOWNLOADS)/$(ANGLE_ASSET)
 	touch $@
 
 # Ogg
@@ -236,6 +245,7 @@ $(SOURCES)/openal-soft/$(CMAKE_BUILDDIR)/Makefile: $(SOURCES)/openal-soft/CMakeL
 
 # OpenSSL. A released PSDK game requires openssl at boot.
 OPENSSL_VERSION := 3.5.7
+OPENSSL_SHA256 := a8c0d28a529ca480f9f36cf5792e2cd21984552a3c8e4aa11a24aa31aeac98e8
 OPENSSL_DIR := $(DOWNLOADS)/openssl-$(OPENSSL_VERSION)
 OPENSSL_CONFIGURE_TARGET := ios64-xcrun
 OPENSSL_CONFIGURE_FLAGS := -miphoneos-version-min=$(MINIMUM_REQUIRED)
@@ -253,7 +263,7 @@ openssl: init_dirs $(BUILD_PREFIX)/.openssl-installed
 $(LIBDIR)/libcrypto.a: $(BUILD_PREFIX)/.openssl-installed
 
 $(BUILD_PREFIX)/.openssl-installed: $(OPENSSL_CONFIGURED)
-	cd $(OPENSSL_DIR); $(MAKE) -j$(NPROC); $(MAKE) install_sw
+	cd $(OPENSSL_DIR); $(MAKE) -j$(NPROC) build_libs; $(MAKE) install_dev
 	touch $@
 
 # A pristine tree for each SDK. `make distclean` left simulator objects
@@ -266,12 +276,15 @@ $(OPENSSL_CONFIGURED): $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz
 		--prefix="$(BUILD_PREFIX)" \
 		--libdir=lib \
 		--openssldir="$(BUILD_PREFIX)/ssl" \
+		CC="$(CC)" -isysroot $(SYSROOT) \
 		$(OPENSSL_CONFIGURE_FLAGS)
 	$(MARK_SDK_CONFIGURED)
 
 $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz:
 	@mkdir -p $(DOWNLOADS)
-	curl -fL --retry 3 -o $@ $(GITHUB)/openssl/openssl/releases/download/openssl-$(OPENSSL_VERSION)/openssl-$(OPENSSL_VERSION).tar.gz
+	$(CURL) -o $@.part $(GITHUB)/openssl/openssl/releases/download/openssl-$(OPENSSL_VERSION)/openssl-$(OPENSSL_VERSION).tar.gz
+	echo "$(OPENSSL_SHA256)  $@.part" | shasum -a 256 -c
+	mv $@.part $@
 
 # FreeType (submodule)
 freetype: init_dirs libpng $(LIBDIR)/libfreetype.a
@@ -384,25 +397,34 @@ RUBY_CONFIGURE_ARGS := \
 	--build=$(RBUILD) \
 	--with-libyaml-dir="$(BUILD_PREFIX)"
 
+# RUBY_CONFIG_CACHE_DIR=<dir> keeps the configure results of each Ruby
+# in <dir>. configure trusts these results, so clear <dir> when the
+# compiler, the flags or the libraries change.
+RUBY_CONFIG_CACHE_DIR ?=
+
 # Ruby 3.0 bundles the openssl gem 2.2.2, which refuses to build
 # against OpenSSL 3. Ruby 3.1.3 bundles the openssl gem 3.0.1, which
 # builds against it, so that ext/openssl replaces the one of Ruby 2.5
 # and 3.0. A released PSDK game requires openssl at boot. Ruby 3.2 and
 # 3.3 bundle the openssl gems 3.1.0 and 3.2.0, which build as they are.
+#
+# GitHub runners sometimes cannot resolve cache.ruby-lang.org, so the
+# folder comes from the v3_1_3 tag on GitHub. Its files are the same as
+# in ruby-3.1.3.tar.gz.
 RUBY31_OPENSSL_VERSION := 3.1.3
-RUBY31_OPENSSL_SHA256 := 5ea498a35f4cd15875200a52dde42b6eb179e1264e17d78732c3a57cd1c6ab9e
+RUBY31_OPENSSL_COMMIT := 1a6b16756e0ba6b95ab71a441357ed5484e33498
 RUBY31_OPENSSL := $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION)-openssl
 
 $(RUBY31_OPENSSL)/extconf.rb:
-	@mkdir -p $(DOWNLOADS)
-	curl -fL --retry 3 -o $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz \
-		https://cache.ruby-lang.org/pub/ruby/3.1/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz
-	echo "$(RUBY31_OPENSSL_SHA256)  $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz" | shasum -a 256 -c
-	rm -rf $(RUBY31_OPENSSL)
+	rm -rf $(RUBY31_OPENSSL) $(RUBY31_OPENSSL).git
+	git init -q --bare $(RUBY31_OPENSSL).git
+	$(RETRY) git -C $(RUBY31_OPENSSL).git fetch -q --depth 1 --filter=blob:none \
+		$(GITHUB)/ruby/ruby.git $(RUBY31_OPENSSL_COMMIT)
 	mkdir -p $(RUBY31_OPENSSL)
-	tar -xzf $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz -C $(RUBY31_OPENSSL) \
-		--strip-components 3 ruby-$(RUBY31_OPENSSL_VERSION)/ext/openssl
-	rm $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz
+	git -C $(RUBY31_OPENSSL).git archive $(RUBY31_OPENSSL_COMMIT) ext/openssl \
+		| tar -x -C $(RUBY31_OPENSSL) --strip-components 2
+	rm -rf $(RUBY31_OPENSSL).git
+	test -f $@
 
 ifneq ($(filter 25 30,$(PSDK_RUBY)),)
 PSDK_RUBY_CONFIGURE_DEPS := $(RUBY31_OPENSSL)/extconf.rb
@@ -468,11 +490,11 @@ $(RUBY_LIB): $(PSDK_RUBY_SRC)/.configured-$(SDK_TAG)
 # and zlib at boot, so a lost extension stops the game at its first
 # `require`.
 $(RUBY_EXT_LIB): $(RUBY_LIB)
-	cd $(PSDK_RUBY_SRC); \
-	$(CONFIGURE_ENV) make -j1 $(PSDK_RUBY_MAKE_ARGS) miniruby exts.mk libencs; \
+	set -e; cd $(PSDK_RUBY_SRC); \
+	$(CONFIGURE_ENV) make -j$(NPROC) $(PSDK_RUBY_MAKE_ARGS) miniruby exts.mk libencs; \
 	EXT_TARGETS=$$(awk '/^extensions =/,/[^\\]$$/' exts.mk | tr '\\' ' ' | grep -oE 'ext/[^ ]+' | sed 's|/\.$$|/static|'); \
-	$(CONFIGURE_ENV) make -j1 -f exts.mk ext/extinit.o $$EXT_TARGETS; \
-	$(CONFIGURE_ENV) make -j1 enc/encinit.o
+	$(CONFIGURE_ENV) make -j$(NPROC) -f exts.mk ext/extinit.o $$EXT_TARGETS; \
+	$(CONFIGURE_ENV) make -j$(NPROC) enc/encinit.o
 	@TMPDIR=$$(mktemp -d); \
 	cd $$TMPDIR; \
 	for a in $$(find $(PSDK_RUBY_SRC)/ext -name "*.a" -not -path "*/test/*") \
@@ -526,7 +548,8 @@ $(PSDK_RUBY_SRC)/.configured-$(SDK_TAG): $(PSDK_RUBY_SRC)/configure $(LIBDIR)/li
 	ac_cv_func_close_range=no \
 	ac_cv_func_getattrlist=no \
 	ac_cv_func_fgetattrlist=no \
-	cross_compiling=yes; \
+	cross_compiling=yes \
+	$(if $(RUBY_CONFIG_CACHE_DIR),--cache-file="$(RUBY_CONFIG_CACHE_DIR)/ruby$(PSDK_RUBY)-$(SDK_TAG).cache"); \
 	sed -i '' 's|^ASFLAGS.*=.*|ASFLAGS = $$(ARCH_FLAG) $$(INCFLAGS) $(TARGETFLAGS)|' Makefile
 	$(MARK_SDK_CONFIGURED)
 
@@ -595,11 +618,10 @@ $(PSDK_LIB): $(RUBY_EXT_LIB) $(PSDK_EXPORTS) $(PSDK_ARCHIVES) \
 	@echo "[psdk] Compiling LiteRGSS2 against Ruby $(PSDK_RUBY_VERSION)..."
 	@rm -rf $(PSDK_OBJDIR)
 	@mkdir -p $(PSDK_OBJDIR) $(dir $@)
-	@for src in $(SOURCES)/litergss2/ext/LiteRGSS/*.cpp; do \
+	@ls $(SOURCES)/litergss2/ext/LiteRGSS/*.cpp | xargs -P $(NPROC) -I {} sh -c '\
 	    $(CXX) $(TARGETFLAGS) -std=c++17 -fdeclspec -O3 $(PSDK_RUBY_CXXFLAGS) \
 	        $(PSDK_INCLUDES) -DHAVE_CONFIG_H \
-	        -c $$src -o $(PSDK_OBJDIR)/$$(basename $$src .cpp).o || exit 1; \
-	done
+	        -c "$$1" -o $(PSDK_OBJDIR)/$$(basename "$$1" .cpp).o' sh {}
 	@echo "[psdk] Compiling the core..."
 	@$(CXX) $(TARGETFLAGS) -std=c++17 -O3 $(PSDK_RUBY_CXXFLAGS) -I$(INCLUDEDIR)/ruby$(PSDK_RUBY) \
 	    -c $(ROOT)/src/psdk_core.cpp -o $(PSDK_OBJDIR)/_psdk_core.o

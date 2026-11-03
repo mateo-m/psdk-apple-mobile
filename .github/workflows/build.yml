@@ -1,0 +1,178 @@
+# A run on a tag can restore the caches of the default branch, but not
+# the caches of other tags or branches:
+# https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache
+# So a push to a branch or a manual run saves the caches, and a tag or a
+# pull request only restores them.
+
+name: build
+
+on:
+  workflow_call:
+    inputs:
+      sdks:
+        description: A JSON list of the SDKs to build.
+        required: true
+        type: string
+      keep:
+        description: Keep out/ of each SDK as a workflow artifact.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_MAXSIZE: 500M
+  RUBY_CONFIG_CACHE_DIR: ${{ github.workspace }}/.ruby-config
+
+jobs:
+  sdk:
+    name: ${{ matrix.sdk }}
+    runs-on: macos-26
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: ${{ fromJSON(inputs.sdks) }}
+    env:
+      SAVE_CACHE: ${{ (github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'workflow_dispatch' }}
+      CCACHE: ccache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The image's default Xcode is its newest stable one. A pick by name
+      # would take a beta once the image has one.
+      - name: Show the Xcode version
+        run: xcodebuild -version
+
+      - name: Hash the inputs
+        id: inputs
+        run: |
+          set -euo pipefail
+          {
+            # Ruby's configure refuses a cache from another compiler command,
+            # and the checkout path is part of that command.
+            echo "$GITHUB_WORKSPACE $CCACHE"
+            xcodebuild -version
+            sw_vers -productVersion
+            cmake --version | head -n 1
+            ruby --version
+            brew info --json=v2 --formula autoconf automake libtool bison \
+              | jq -r '.formulae[] | "\(.name) \(.versions.stable)_\(.revision)"'
+            git ls-tree -r HEAD -- Makefile patches sources/ruby25 sources/ruby30 sources/ruby32 sources/ruby33
+          } > "$RUNNER_TEMP/configure.txt"
+          git ls-tree -r HEAD -- src support licenses tools/licenses.rb sources .github/workflows/build.yml \
+            | cat "$RUNNER_TEMP/configure.txt" - > "$RUNNER_TEMP/inputs.txt"
+          {
+            echo "hash=$(shasum -a 256 "$RUNNER_TEMP/inputs.txt" | cut -c1-16)"
+            echo "configure=$(shasum -a 256 "$RUNNER_TEMP/configure.txt" | cut -c1-16)"
+            echo "downloads=$(grep -E '^(ANGLE|OPENSSL|RUBY31_OPENSSL)_(VERSION|SHA256|COMMIT) :=' Makefile | shasum -a 256 | cut -c1-16)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Restore the finished build
+        id: out
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out
+          key: psdk-out-${{ matrix.sdk }}-${{ steps.inputs.outputs.hash }}
+
+      # The check reads two of the forks. A build needs all of them.
+      - name: Fetch the forks
+        env:
+          FORKS: ${{ steps.out.outputs.cache-hit == 'true' && 'sources/sfml sources/litergss2' || '' }}
+        run: |
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          # shellcheck disable=SC2086 # FORKS is a list of paths, or empty for all.
+          git submodule update --init --depth 1 --jobs 9 $FORKS
+
+      - name: Check for launcher code
+        run: scripts/check-no-host-code.sh
+
+      - name: Install the build tools
+        if: steps.out.outputs.cache-hit != 'true'
+        run: brew install autoconf automake libtool bison ccache
+
+      - name: Restore the downloads
+        id: downloads
+        if: steps.out.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            downloads/angle
+            downloads/openssl-*.tar.gz
+            downloads/ruby-*-openssl
+          key: psdk-downloads-${{ steps.inputs.outputs.downloads }}
+
+      - name: Restore ccache
+        if: steps.out.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ccache
+          key: psdk-ccache-${{ matrix.sdk }}-${{ steps.inputs.outputs.hash }}
+          restore-keys: psdk-ccache-${{ matrix.sdk }}-
+
+      - name: Restore the Ruby configure results
+        id: configure
+        if: steps.out.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ruby-config
+          key: psdk-ruby-config-${{ matrix.sdk }}-${{ steps.inputs.outputs.configure }}
+
+      - name: Build
+        if: steps.out.outputs.cache-hit != 'true'
+        run: |
+          ccache --zero-stats
+          mkdir -p "$RUBY_CONFIG_CACHE_DIR"
+          make SDK=${{ matrix.sdk }}
+          ruby tools/licenses.rb write out/licenses.json
+          ccache --show-stats
+
+      - name: Save the downloads
+        if: env.SAVE_CACHE == 'true' && steps.out.outputs.cache-hit != 'true' && steps.downloads.outputs.cache-hit != 'true' && matrix.sdk == fromJSON(inputs.sdks)[0]
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            downloads/angle
+            downloads/openssl-*.tar.gz
+            downloads/ruby-*-openssl
+          key: psdk-downloads-${{ steps.inputs.outputs.downloads }}
+
+      - name: Save the Ruby configure results
+        if: env.SAVE_CACHE == 'true' && steps.out.outputs.cache-hit != 'true' && steps.configure.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ruby-config
+          key: psdk-ruby-config-${{ matrix.sdk }}-${{ steps.inputs.outputs.configure }}
+
+      - name: Save ccache
+        if: env.SAVE_CACHE == 'true' && steps.out.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ccache
+          key: psdk-ccache-${{ matrix.sdk }}-${{ steps.inputs.outputs.hash }}
+
+      - name: Save the finished build
+        if: env.SAVE_CACHE == 'true' && steps.out.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: out
+          key: psdk-out-${{ matrix.sdk }}-${{ steps.inputs.outputs.hash }}
+
+      # An artifact does not keep the file modes, so the tar does.
+      - name: Pack out/
+        if: inputs.keep
+        run: tar -czf psdk-${{ matrix.sdk }}.tar.gz -C out .
+
+      - name: Keep out/
+        if: inputs.keep
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: psdk-${{ matrix.sdk }}
+          path: psdk-${{ matrix.sdk }}.tar.gz
+          compression-level: 0
+          retention-days: 1
