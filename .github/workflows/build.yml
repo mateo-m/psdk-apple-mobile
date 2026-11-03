@@ -42,20 +42,12 @@ jobs:
       SAVE_CACHE: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          submodules: true
-
-      - name: Check for launcher code
-        run: scripts/check-no-host-code.sh
 
       - name: Select the newest Xcode
         run: |
           XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
           sudo xcode-select -s "$XCODE"
           xcodebuild -version
-
-      - name: Install the build tools
-        run: brew install autoconf automake libtool bison ccache
 
       - name: Hash the inputs
         id: inputs
@@ -64,7 +56,8 @@ jobs:
           {
             xcodebuild -version
             sw_vers -productVersion
-            brew list --versions autoconf automake libtool bison
+            brew info --json=v2 --formula autoconf automake libtool bison \
+              | jq -r '.formulae[] | "\(.name) \(.versions.stable)_\(.revision)"'
             git ls-tree -r HEAD -- Makefile patches sources/ruby25 sources/ruby30 sources/ruby32 sources/ruby33
           } > "$RUNNER_TEMP/configure.txt"
           git ls-tree -r HEAD -- src support licenses tools/licenses.rb sources .github/workflows/build.yml \
@@ -79,6 +72,21 @@ jobs:
         with:
           path: out
           key: psdk-out-${{ matrix.sdk }}-${{ steps.inputs.outputs.hash }}
+
+      # The check reads two of the forks. A build needs all of them.
+      - name: Fetch the forks
+        env:
+          FORKS: ${{ steps.out.outputs.cache-hit == 'true' && 'sources/sfml sources/litergss2' || '' }}
+        run: |
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          git submodule update --init --depth 1 --jobs 9 $FORKS
+
+      - name: Check for launcher code
+        run: scripts/check-no-host-code.sh
+
+      - name: Install the build tools
+        if: steps.out.outputs.cache-hit != 'true'
+        run: brew install autoconf automake libtool bison ccache
 
       - name: Restore the downloads
         id: downloads
