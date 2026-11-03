@@ -9,8 +9,9 @@
 # Two things fail:
 #   - The launcher names "empo" and "mkxp-ios" anywhere in the repo's own
 #     files or in the forks.
-#     The ANGLE download from the empo-deps release is a file location,
-#     not launcher code, so that one name is allowed.
+#     The ANGLE download from the empo-deps release and the release
+#     event that CI sends to the empo-app repo are locations, not launcher
+#     code, so these two names are allowed.
 #   - A weak declaration or a weak import in the forks or in src/. A weak
 #     name is how a library calls a function that the host may define.
 #     SFML's own weak sfmlMain in SFMain.mm is upstream code and stays.
@@ -22,7 +23,7 @@ status=0
 
 launcher='(^|[^[:alnum:]_])(empo|mkxp-ios)([^[:alnum:]_]|$)'
 
-if git grep -niIE "$launcher" -- . ':!scripts/check-no-host-code.sh' | grep -v 'mateo-m/empo-deps/'
+if git grep -niIE "$launcher" -- . ':!scripts/check-no-host-code.sh' | grep -vE 'mateo-m/empo-(deps|app)/'
 then
     echo "error: the lines above name a launcher" >&2
     status=1
