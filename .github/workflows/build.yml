@@ -43,11 +43,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Select the newest Xcode
-        run: |
-          XCODE="$(ls -d /Applications/Xcode*.app | sort -V | tail -n 1)"
-          sudo xcode-select -s "$XCODE"
-          xcodebuild -version
+      # The image's default Xcode is its newest stable one. A pick by name
+      # would take a beta once the image has one.
+      - name: Show the Xcode version
+        run: xcodebuild -version
 
       - name: Hash the inputs
         id: inputs
@@ -62,9 +61,11 @@ jobs:
           } > "$RUNNER_TEMP/configure.txt"
           git ls-tree -r HEAD -- src support licenses tools/licenses.rb sources .github/workflows/build.yml \
             | cat "$RUNNER_TEMP/configure.txt" - > "$RUNNER_TEMP/inputs.txt"
-          echo "hash=$(shasum -a 256 "$RUNNER_TEMP/inputs.txt" | cut -c1-16)" >> "$GITHUB_OUTPUT"
-          echo "configure=$(shasum -a 256 "$RUNNER_TEMP/configure.txt" | cut -c1-16)" >> "$GITHUB_OUTPUT"
-          echo "downloads=$(grep -E '^(ANGLE|OPENSSL|RUBY31_OPENSSL)_(VERSION|SHA256|COMMIT) :=' Makefile | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+          {
+            echo "hash=$(shasum -a 256 "$RUNNER_TEMP/inputs.txt" | cut -c1-16)"
+            echo "configure=$(shasum -a 256 "$RUNNER_TEMP/configure.txt" | cut -c1-16)"
+            echo "downloads=$(grep -E '^(ANGLE|OPENSSL|RUBY31_OPENSSL)_(VERSION|SHA256|COMMIT) :=' Makefile | shasum -a 256 | cut -c1-16)"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Restore the finished build
         id: out
@@ -79,6 +80,7 @@ jobs:
           FORKS: ${{ steps.out.outputs.cache-hit == 'true' && 'sources/sfml sources/litergss2' || '' }}
         run: |
           git config --global url."https://github.com/".insteadOf git@github.com:
+          # shellcheck disable=SC2086 # FORKS is a list of paths, or empty for all.
           git submodule update --init --depth 1 --jobs 9 $FORKS
 
       - name: Check for launcher code
