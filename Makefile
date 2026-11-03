@@ -595,11 +595,10 @@ $(PSDK_LIB): $(RUBY_EXT_LIB) $(PSDK_EXPORTS) $(PSDK_ARCHIVES) \
 	@echo "[psdk] Compiling LiteRGSS2 against Ruby $(PSDK_RUBY_VERSION)..."
 	@rm -rf $(PSDK_OBJDIR)
 	@mkdir -p $(PSDK_OBJDIR) $(dir $@)
-	@for src in $(SOURCES)/litergss2/ext/LiteRGSS/*.cpp; do \
+	@ls $(SOURCES)/litergss2/ext/LiteRGSS/*.cpp | xargs -P $(NPROC) -I {} sh -c '\
 	    $(CXX) $(TARGETFLAGS) -std=c++17 -fdeclspec -O3 $(PSDK_RUBY_CXXFLAGS) \
 	        $(PSDK_INCLUDES) -DHAVE_CONFIG_H \
-	        -c $$src -o $(PSDK_OBJDIR)/$$(basename $$src .cpp).o || exit 1; \
-	done
+	        -c "$$1" -o $(PSDK_OBJDIR)/$$(basename "$$1" .cpp).o' sh {}
 	@echo "[psdk] Compiling the core..."
 	@$(CXX) $(TARGETFLAGS) -std=c++17 -O3 $(PSDK_RUBY_CXXFLAGS) -I$(INCLUDEDIR)/ruby$(PSDK_RUBY) \
 	    -c $(ROOT)/src/psdk_core.cpp -o $(PSDK_OBJDIR)/_psdk_core.o
