@@ -71,6 +71,7 @@ AR  := $(shell xcrun --sdk $(SDK) -f ar)
 RANLIB := $(shell xcrun --sdk $(SDK) -f ranlib)
 PKG_CONFIG_LIBDIR := $(LIBDIR)/pkgconfig
 CLONE := git clone -q
+CURL := curl -fL --retry 5 --retry-all-errors --retry-delay 10
 GITHUB := https://github.com
 
 # The host build triple. Apple's system Ruby reports a triple that
@@ -127,7 +128,7 @@ angle: $(ANGLE_STAMP)
 
 $(ANGLE_STAMP):
 	@mkdir -p $(DOWNLOADS)
-	curl -fL --retry 3 -o $(DOWNLOADS)/angle-ios-prebuilt.tar.gz \
+	$(CURL) -o $(DOWNLOADS)/angle-ios-prebuilt.tar.gz \
 		$(GITHUB)/mateo-m/empo-deps/releases/download/$(ANGLE_VERSION)/angle-ios-prebuilt.tar.gz
 	echo "$(ANGLE_SHA256)  $(DOWNLOADS)/angle-ios-prebuilt.tar.gz" | shasum -a 256 -c
 	rm -rf $(ANGLE_DIR)
@@ -271,7 +272,7 @@ $(OPENSSL_CONFIGURED): $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz
 
 $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz:
 	@mkdir -p $(DOWNLOADS)
-	curl -fL --retry 3 -o $@ $(GITHUB)/openssl/openssl/releases/download/openssl-$(OPENSSL_VERSION)/openssl-$(OPENSSL_VERSION).tar.gz
+	$(CURL) -o $@ $(GITHUB)/openssl/openssl/releases/download/openssl-$(OPENSSL_VERSION)/openssl-$(OPENSSL_VERSION).tar.gz
 
 # FreeType (submodule)
 freetype: init_dirs libpng $(LIBDIR)/libfreetype.a
@@ -395,7 +396,7 @@ RUBY31_OPENSSL := $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION)-openssl
 
 $(RUBY31_OPENSSL)/extconf.rb:
 	@mkdir -p $(DOWNLOADS)
-	curl -fL --retry 3 -o $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz \
+	$(CURL) -o $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz \
 		https://cache.ruby-lang.org/pub/ruby/3.1/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz
 	echo "$(RUBY31_OPENSSL_SHA256)  $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz" | shasum -a 256 -c
 	rm -rf $(RUBY31_OPENSSL)
