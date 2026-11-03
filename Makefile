@@ -65,8 +65,12 @@ NPROC := $(shell sysctl -n hw.ncpu)
 CFLAGS := -I$(INCLUDEDIR) -I$(INCLUDEDIR)/freetype2 $(TARGETFLAGS) -O3
 CXXFLAGS := $(CFLAGS)
 LDFLAGS := -L$(LIBDIR) $(TARGETFLAGS)
-CC  := $(shell xcrun --sdk $(SDK) -f clang) -arch $(ARCH)
-CXX := $(shell xcrun --sdk $(SDK) -f clang++) -arch $(ARCH)
+# CCACHE=ccache puts ccache in front of each compile.
+CCACHE ?=
+CLANG := $(shell xcrun --sdk $(SDK) -f clang) -arch $(ARCH)
+CLANGXX := $(shell xcrun --sdk $(SDK) -f clang++) -arch $(ARCH)
+CC  := $(strip $(CCACHE) $(CLANG))
+CXX := $(strip $(CCACHE) $(CLANGXX))
 AR  := $(shell xcrun --sdk $(SDK) -f ar)
 RANLIB := $(shell xcrun --sdk $(SDK) -f ranlib)
 PKG_CONFIG_LIBDIR := $(LIBDIR)/pkgconfig
@@ -101,10 +105,11 @@ CMAKE_ARGS := \
 	-DCMAKE_FIND_ROOT_PATH="$(BUILD_PREFIX)" \
 	-DCMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH \
 	-DCMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH \
-	-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH
+	-DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH \
+	$(if $(CCACHE),-DCMAKE_C_COMPILER_LAUNCHER=$(CCACHE) -DCMAKE_CXX_COMPILER_LAUNCHER=$(CCACHE))
 
 CONFIGURE := $(CONFIGURE_ENV) ./configure $(CONFIGURE_ARGS)
-CMAKE     := $(CONFIGURE_ENV) cmake .. $(CMAKE_ARGS)
+CMAKE     := $(CONFIGURE_ENV) CC="$(CLANG)" CXX="$(CLANGXX)" cmake .. $(CMAKE_ARGS)
 
 .PHONY: all init_dirs angle libogg libvorbis libflac libpng openal openssl freetype sfml litecgss
 
