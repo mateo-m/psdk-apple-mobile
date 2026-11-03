@@ -394,6 +394,11 @@ RUBY_CONFIGURE_ARGS := \
 	--build=$(RBUILD) \
 	--with-libyaml-dir="$(BUILD_PREFIX)"
 
+# RUBY_CONFIG_CACHE_DIR=<dir> keeps the configure results of each Ruby
+# in <dir>. configure trusts these results, so clear <dir> when the
+# compiler, the flags or the libraries change.
+RUBY_CONFIG_CACHE_DIR ?=
+
 # Ruby 3.0 bundles the openssl gem 2.2.2, which refuses to build
 # against OpenSSL 3. Ruby 3.1.3 bundles the openssl gem 3.0.1, which
 # builds against it, so that ext/openssl replaces the one of Ruby 2.5
@@ -536,7 +541,8 @@ $(PSDK_RUBY_SRC)/.configured-$(SDK_TAG): $(PSDK_RUBY_SRC)/configure $(LIBDIR)/li
 	ac_cv_func_close_range=no \
 	ac_cv_func_getattrlist=no \
 	ac_cv_func_fgetattrlist=no \
-	cross_compiling=yes; \
+	cross_compiling=yes \
+	$(if $(RUBY_CONFIG_CACHE_DIR),--cache-file="$(RUBY_CONFIG_CACHE_DIR)/ruby$(PSDK_RUBY)-$(SDK_TAG).cache"); \
 	sed -i '' 's|^ASFLAGS.*=.*|ASFLAGS = $$(ARCH_FLAG) $$(INCFLAGS) $(TARGETFLAGS)|' Makefile
 	$(MARK_SDK_CONFIGURED)
 
