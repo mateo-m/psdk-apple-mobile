@@ -64,7 +64,7 @@ jobs:
             | cat "$RUNNER_TEMP/configure.txt" - > "$RUNNER_TEMP/inputs.txt"
           echo "hash=$(shasum -a 256 "$RUNNER_TEMP/inputs.txt" | cut -c1-16)" >> "$GITHUB_OUTPUT"
           echo "configure=$(shasum -a 256 "$RUNNER_TEMP/configure.txt" | cut -c1-16)" >> "$GITHUB_OUTPUT"
-          echo "downloads=$(grep -E '^(ANGLE|OPENSSL|RUBY31_OPENSSL)_(VERSION|SHA256) :=' Makefile | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
+          echo "downloads=$(grep -E '^(ANGLE|OPENSSL|RUBY31_OPENSSL)_(VERSION|SHA256|COMMIT) :=' Makefile | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
       - name: Restore the finished build
         id: out

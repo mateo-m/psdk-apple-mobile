@@ -405,20 +405,24 @@ RUBY_CONFIG_CACHE_DIR ?=
 # builds against it, so that ext/openssl replaces the one of Ruby 2.5
 # and 3.0. A released PSDK game requires openssl at boot. Ruby 3.2 and
 # 3.3 bundle the openssl gems 3.1.0 and 3.2.0, which build as they are.
+#
+# GitHub runners sometimes cannot resolve cache.ruby-lang.org, so the
+# folder comes from the v3_1_3 tag on GitHub. Its files are the same as
+# in ruby-3.1.3.tar.gz.
 RUBY31_OPENSSL_VERSION := 3.1.3
-RUBY31_OPENSSL_SHA256 := 5ea498a35f4cd15875200a52dde42b6eb179e1264e17d78732c3a57cd1c6ab9e
+RUBY31_OPENSSL_COMMIT := 1a6b16756e0ba6b95ab71a441357ed5484e33498
 RUBY31_OPENSSL := $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION)-openssl
 
 $(RUBY31_OPENSSL)/extconf.rb:
-	@mkdir -p $(DOWNLOADS)
-	$(CURL) -o $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz \
-		https://cache.ruby-lang.org/pub/ruby/3.1/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz
-	echo "$(RUBY31_OPENSSL_SHA256)  $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz" | shasum -a 256 -c
-	rm -rf $(RUBY31_OPENSSL)
+	rm -rf $(RUBY31_OPENSSL) $(RUBY31_OPENSSL).git
+	git init -q --bare $(RUBY31_OPENSSL).git
+	git -C $(RUBY31_OPENSSL).git fetch -q --depth 1 --filter=blob:none \
+		$(GITHUB)/ruby/ruby.git $(RUBY31_OPENSSL_COMMIT)
 	mkdir -p $(RUBY31_OPENSSL)
-	tar -xzf $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz -C $(RUBY31_OPENSSL) \
-		--strip-components 3 ruby-$(RUBY31_OPENSSL_VERSION)/ext/openssl
-	rm $(DOWNLOADS)/ruby-$(RUBY31_OPENSSL_VERSION).tar.gz
+	git -C $(RUBY31_OPENSSL).git archive $(RUBY31_OPENSSL_COMMIT) ext/openssl \
+		| tar -x -C $(RUBY31_OPENSSL) --strip-components 2
+	rm -rf $(RUBY31_OPENSSL).git
+	test -f $@
 
 ifneq ($(filter 25 30,$(PSDK_RUBY)),)
 PSDK_RUBY_CONFIGURE_DEPS := $(RUBY31_OPENSSL)/extconf.rb
