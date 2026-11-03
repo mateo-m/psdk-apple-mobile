@@ -1,8 +1,8 @@
 # A run on a tag can restore the caches of the default branch, but not
 # the caches of other tags or branches:
 # https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#restrictions-for-accessing-a-cache
-# So a push or a manual run saves the caches, and a tag or a pull request
-# only restores them.
+# So a push to a branch or a manual run saves the caches, and a tag or a
+# pull request only restores them.
 
 name: build
 
@@ -39,7 +39,8 @@ jobs:
       matrix:
         sdk: ${{ fromJSON(inputs.sdks) }}
     env:
-      SAVE_CACHE: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+      SAVE_CACHE: ${{ (github.event_name == 'push' && github.ref_type == 'branch') || github.event_name == 'workflow_dispatch' }}
+      CCACHE: ccache
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -51,10 +52,15 @@ jobs:
       - name: Hash the inputs
         id: inputs
         run: |
-          set -eu
+          set -euo pipefail
           {
+            # Ruby's configure refuses a cache from another compiler command,
+            # and the checkout path is part of that command.
+            echo "$GITHUB_WORKSPACE $CCACHE"
             xcodebuild -version
             sw_vers -productVersion
+            cmake --version | head -n 1
+            ruby --version
             brew info --json=v2 --formula autoconf automake libtool bison \
               | jq -r '.formulae[] | "\(.name) \(.versions.stable)_\(.revision)"'
             git ls-tree -r HEAD -- Makefile patches sources/ruby25 sources/ruby30 sources/ruby32 sources/ruby33
@@ -122,7 +128,7 @@ jobs:
         run: |
           ccache --zero-stats
           mkdir -p "$RUBY_CONFIG_CACHE_DIR"
-          make SDK=${{ matrix.sdk }} CCACHE=ccache
+          make SDK=${{ matrix.sdk }}
           ruby tools/licenses.rb write out/licenses.json
           ccache --show-stats
 
