@@ -469,10 +469,10 @@ $(RUBY_LIB): $(PSDK_RUBY_SRC)/.configured-$(SDK_TAG)
 # `require`.
 $(RUBY_EXT_LIB): $(RUBY_LIB)
 	cd $(PSDK_RUBY_SRC); \
-	$(CONFIGURE_ENV) make -j1 $(PSDK_RUBY_MAKE_ARGS) miniruby exts.mk libencs; \
+	$(CONFIGURE_ENV) make -j$(NPROC) $(PSDK_RUBY_MAKE_ARGS) miniruby exts.mk libencs; \
 	EXT_TARGETS=$$(awk '/^extensions =/,/[^\\]$$/' exts.mk | tr '\\' ' ' | grep -oE 'ext/[^ ]+' | sed 's|/\.$$|/static|'); \
-	$(CONFIGURE_ENV) make -j1 -f exts.mk ext/extinit.o $$EXT_TARGETS; \
-	$(CONFIGURE_ENV) make -j1 enc/encinit.o
+	$(CONFIGURE_ENV) make -j$(NPROC) -f exts.mk ext/extinit.o $$EXT_TARGETS; \
+	$(CONFIGURE_ENV) make -j$(NPROC) enc/encinit.o
 	@TMPDIR=$$(mktemp -d); \
 	cd $$TMPDIR; \
 	for a in $$(find $(PSDK_RUBY_SRC)/ext -name "*.a" -not -path "*/test/*") \
