@@ -119,8 +119,9 @@ init_dirs:
 # ANGLE (prebuilt). SFML draws with GLES through ANGLE, which draws with
 # Metal. The core needs the headers only. A host links the static
 # libraries of the same release.
-ANGLE_VERSION := angle-2026-05-04
-ANGLE_SHA256 := 0cd2b87b132b2c1344fe356ebcb57fa6ec63675d33d6fa11deb8a16bd57d3b9c
+ANGLE_VERSION := angle-2026-11-01
+ANGLE_SHA256 := 22f6b332acaa9973650c30a99314287594fbf9ed38db682c2389bd34181e7831
+ANGLE_ASSET := angle-apple-prebuilt.tar.gz
 ANGLE_DIR := $(DOWNLOADS)/angle
 ANGLE_STAMP := $(ANGLE_DIR)/.$(ANGLE_VERSION)
 
@@ -128,13 +129,13 @@ angle: $(ANGLE_STAMP)
 
 $(ANGLE_STAMP):
 	@mkdir -p $(DOWNLOADS)
-	$(CURL) -o $(DOWNLOADS)/angle-ios-prebuilt.tar.gz \
-		$(GITHUB)/mateo-m/empo-deps/releases/download/$(ANGLE_VERSION)/angle-ios-prebuilt.tar.gz
-	echo "$(ANGLE_SHA256)  $(DOWNLOADS)/angle-ios-prebuilt.tar.gz" | shasum -a 256 -c
+	$(CURL) -o $(DOWNLOADS)/$(ANGLE_ASSET) \
+		$(GITHUB)/mateo-m/empo-deps/releases/download/$(ANGLE_VERSION)/$(ANGLE_ASSET)
+	echo "$(ANGLE_SHA256)  $(DOWNLOADS)/$(ANGLE_ASSET)" | shasum -a 256 -c
 	rm -rf $(ANGLE_DIR)
 	mkdir -p $(ANGLE_DIR)
-	tar -xzf $(DOWNLOADS)/angle-ios-prebuilt.tar.gz -C $(ANGLE_DIR)
-	rm $(DOWNLOADS)/angle-ios-prebuilt.tar.gz
+	tar -xzf $(DOWNLOADS)/$(ANGLE_ASSET) -C $(ANGLE_DIR)
+	rm $(DOWNLOADS)/$(ANGLE_ASSET)
 	touch $@
 
 # Ogg
