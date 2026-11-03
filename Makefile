@@ -274,6 +274,7 @@ $(OPENSSL_CONFIGURED): $(DOWNLOADS)/openssl-$(OPENSSL_VERSION).tar.gz
 		--prefix="$(BUILD_PREFIX)" \
 		--libdir=lib \
 		--openssldir="$(BUILD_PREFIX)/ssl" \
+		CC="$(CC)" -isysroot $(SYSROOT) \
 		$(OPENSSL_CONFIGURE_FLAGS)
 	$(MARK_SDK_CONFIGURED)
 
