@@ -15,8 +15,11 @@ on:
 
 # A tag pushed with its commit waits for the run on main, and then takes
 # the three builds from the cache that run saved.
+# queue: max keeps every waiting run. Without it, a new run cancels the
+# one that waits.
 concurrency:
   group: release-${{ github.sha }}
+  queue: max
 
 permissions:
   contents: read
@@ -105,6 +108,13 @@ jobs:
           printf 'Built from `%s`.\n\nsha256: `%s`\n' "$GITHUB_SHA" "$SHA256" > notes.md
           gh release create "$GITHUB_REF_NAME" psdk-ios.tar.gz -R "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes-file notes.md
 
+  # A job of its own, so a re-run after a failed event does not create the
+  # release a second time.
+  notify:
+    needs: [package, publish]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
       - name: Send the core-released event
         env:
           GH_TOKEN: ${{ secrets.RELEASE_DISPATCH_TOKEN }}
