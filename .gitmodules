@@ -19,7 +19,7 @@
 [submodule "sources/litergss2"]
 	path = sources/litergss2
 	url = git@github.com:mateo-m/litergss2-apple-mobile
-	branch = dev
+	branch = main
 [submodule "sources/ruby25"]
 	path = sources/ruby25
 	url = git@github.com:ruby/ruby.git
