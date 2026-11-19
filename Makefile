@@ -10,16 +10,18 @@
 SDK ?= iphonesimulator
 ARCH := arm64
 HOST := aarch64-apple-darwin
-MINIMUM_REQUIRED := 26.0
 RUBIES ?= 25 30 32 33
 
 ifeq ($(SDK),iphonesimulator)
+MINIMUM_REQUIRED := 17.0
 TARGET_FLAG := -mios-simulator-version-min=$(MINIMUM_REQUIRED) -target $(ARCH)-apple-ios$(MINIMUM_REQUIRED)-simulator
 LD_PLATFORM := ios-simulator
 else ifeq ($(SDK),iphoneos)
+MINIMUM_REQUIRED := 17.0
 TARGET_FLAG := -miphoneos-version-min=$(MINIMUM_REQUIRED) -target $(ARCH)-apple-ios$(MINIMUM_REQUIRED)
 LD_PLATFORM := ios
 else ifeq ($(SDK),macosx)
+MINIMUM_REQUIRED := 14.0
 TARGET_FLAG := -mmacosx-version-min=$(MINIMUM_REQUIRED) -target $(ARCH)-apple-macos$(MINIMUM_REQUIRED)
 LD_PLATFORM := macos
 # SFML's Cocoa backend keeps methods in Objective-C categories, and
