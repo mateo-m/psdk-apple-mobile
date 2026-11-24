@@ -392,7 +392,7 @@ RUBY_CONFIGURE_ARGS := \
 	--disable-shared \
 	--enable-install-static-library \
 	--with-static-linked-ext \
-	--with-out-ext=fiddle,gdbm,win32ole,win32,pty,syslog,readline,bigdecimal \
+	--with-out-ext=fiddle,gdbm,win32ole,win32,pty,syslog,readline \
 	--disable-rubygems \
 	--disable-install-doc \
 	--disable-jit-support \
@@ -490,7 +490,8 @@ $(RUBY_LIB): $(PSDK_RUBY_SRC)/.configured-$(SDK_TAG)
 
 # A released PSDK game requires socket, openssl, net/http, csv, json
 # and zlib at boot, so a lost extension stops the game at its first
-# `require`.
+# `require`. Pokémon Gary also requires bigdecimal, through the
+# multi_xml gem that it ships.
 $(RUBY_EXT_LIB): $(RUBY_LIB)
 	set -e; cd $(PSDK_RUBY_SRC); \
 	$(CONFIGURE_ENV) make -j$(NPROC) $(PSDK_RUBY_MAKE_ARGS) miniruby exts.mk libencs; \
@@ -514,7 +515,7 @@ $(RUBY_EXT_LIB): $(RUBY_LIB)
 	rm -rf $$TMPDIR
 	$(AR) d $(RUBY_LIB) dmyext.o dmyenc.o || true
 	$(RANLIB) $(RUBY_LIB)
-	@for sym in _Init_socket _Init_openssl _Init_zlib _Init_parser _Init_generator _Init_psych; do \
+	@for sym in _Init_socket _Init_openssl _Init_zlib _Init_parser _Init_generator _Init_psych _Init_bigdecimal; do \
 	    nm $@ 2>/dev/null | grep -q "T $$sym" || { \
 	        echo "ERROR: $$sym missing from $@ (check $(PSDK_RUBY_SRC)/ext/*/mkmf.log)"; \
 	        rm -f $@; \
@@ -528,7 +529,7 @@ $(RUBY_EXT_LIB): $(RUBY_LIB)
 # with `-Werror`. So ext/socket's IN6_IS_ADDR_UNSPECIFIED probe fails,
 # extconf reads `/usr/include/netinet6/in6.h`, which a current SDK does
 # not have, and the whole socket extension disappears.
-$(PSDK_RUBY_SRC)/.configured-$(SDK_TAG): $(PSDK_RUBY_SRC)/configure $(LIBDIR)/libcrypto.a $(LIBDIR)/libyaml.a
+$(PSDK_RUBY_SRC)/.configured-$(SDK_TAG): $(PSDK_RUBY_SRC)/configure $(LIBDIR)/libcrypto.a $(LIBDIR)/libyaml.a $(ROOT)/Makefile
 	cd $(PSDK_RUBY_SRC); $(MAKE) distclean 2>/dev/null || true
 	cd $(PSDK_RUBY_SRC); \
 	export $(CONFIGURE_ENV); \
@@ -692,7 +693,7 @@ PSDK_SUPPORT_DIR := $(OUT)/support/$(PSDK_RUBY_VERSION)
 # 8.7 MB.
 PSDK_SUPPORT_SKIP := bundler bundler.rb rdoc rdoc.rb
 
-PSDK_SUPPORT_EXT := socket digest openssl date json psych
+PSDK_SUPPORT_EXT := socket digest openssl date json psych bigdecimal
 
 psdk-support: $(RUBY_EXT_LIB)
 	rm -rf $(PSDK_SUPPORT_DIR)

@@ -3,3 +3,4 @@
 # No syntax-transform patches: those exist only for Ruby 3.1.
 ruby30/ios.patch
 ruby30/load-i386-bytecode.patch
+ruby30/bigdecimal-enter.patch
