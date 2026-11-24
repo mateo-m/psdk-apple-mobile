@@ -529,7 +529,7 @@ $(RUBY_EXT_LIB): $(RUBY_LIB)
 # with `-Werror`. So ext/socket's IN6_IS_ADDR_UNSPECIFIED probe fails,
 # extconf reads `/usr/include/netinet6/in6.h`, which a current SDK does
 # not have, and the whole socket extension disappears.
-$(PSDK_RUBY_SRC)/.configured-$(SDK_TAG): $(PSDK_RUBY_SRC)/configure $(LIBDIR)/libcrypto.a $(LIBDIR)/libyaml.a
+$(PSDK_RUBY_SRC)/.configured-$(SDK_TAG): $(PSDK_RUBY_SRC)/configure $(LIBDIR)/libcrypto.a $(LIBDIR)/libyaml.a $(ROOT)/Makefile
 	cd $(PSDK_RUBY_SRC); $(MAKE) distclean 2>/dev/null || true
 	cd $(PSDK_RUBY_SRC); \
 	export $(CONFIGURE_ENV); \
