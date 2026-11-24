@@ -43,3 +43,12 @@ compiled method with each field count. Only the correct count ends at the zero
 padding before the offset list. If no count fits, the loader raises an error.
 
 `tools/psdk-bytecode-check/` has the test and its result.
+
+## `bigdecimal-enter.patch`
+
+- **Applies to**: Ruby 3.0.7, `ext/bigdecimal/bigdecimal.c`.
+- **Problem**: the `ENTER` macro puts `RB_UNUSED_VAR` on an array. With the
+  current Xcode clang this gives "'maybe_unused' attribute cannot be applied
+  to types", and bigdecimal does not compile.
+- **Change**: the `ENTER` macro of Ruby 3.2, which puts
+  `RBIMPL_ATTR_MAYBE_UNUSED()` before the declaration.

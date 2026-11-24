@@ -693,7 +693,7 @@ PSDK_SUPPORT_DIR := $(OUT)/support/$(PSDK_RUBY_VERSION)
 # 8.7 MB.
 PSDK_SUPPORT_SKIP := bundler bundler.rb rdoc rdoc.rb
 
-PSDK_SUPPORT_EXT := socket digest openssl date json psych
+PSDK_SUPPORT_EXT := socket digest openssl date json psych bigdecimal
 
 psdk-support: $(RUBY_EXT_LIB)
 	rm -rf $(PSDK_SUPPORT_DIR)

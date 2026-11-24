@@ -15,8 +15,9 @@ require litergss1 if File.exist?(litergss1)
 
 # On Windows, the ruby.exe of a game also loads the gems that the game
 # adds to its lib/ruby/<version> folder. Pokémon Gary requires
-# socket.io-client-simple from there. The folder goes last, so that the
-# files of this Ruby still load first.
+# socket.io-client-simple from there. The folder goes last, because it
+# also holds a copy of the standard library that can differ from the C
+# extensions of this Ruby, for example openssl 2.2 against 3.0.1.
 $LOAD_PATH.push(File.join(Dir.pwd, 'lib', 'ruby', RUBY_VERSION.sub(/\d+\z/, '0')))
 
 # A released PSDK game runs `STDERR.reopen(IO::NULL)` when
